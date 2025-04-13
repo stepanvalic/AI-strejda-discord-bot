@@ -16,7 +16,6 @@ class Counting(commands.Cog):
         self.bot.loop.create_task(self.update_channel_topic())
 
     def load_data(self):
-        """Load counting data from JSON file"""
         os.makedirs(os.path.dirname(COUNTING_SAVE_FILE), exist_ok=True)
 
         if not os.path.exists(COUNTING_SAVE_FILE):
@@ -34,7 +33,7 @@ class Counting(commands.Cog):
         try:
             with open(COUNTING_SAVE_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                # Zajistíme, že existuje klíč user_stats pro zpětnou kompatibilitu
+
                 if "user_stats" not in data:
                     data["user_stats"] = {}
                 return data
@@ -48,12 +47,10 @@ class Counting(commands.Cog):
             }
 
     def save_data(self):
-        """Save counting data to JSON file"""
         with open(COUNTING_SAVE_FILE, 'w', encoding='utf-8') as f:
             json.dump(self.data, f, indent=2)
 
     async def update_channel_topic(self):
-        """Update the channel topic with the next number"""
         if not self.bot.is_ready():
             await self.bot.wait_until_ready()
 
@@ -74,8 +71,7 @@ class Counting(commands.Cog):
             print(f"Error updating channel topic: {e}")
 
     def update_user_stats(self, user_id, username, success=True):
-        """Update user statistics"""
-        user_id = str(user_id)  # Convert to string for JSON compatibility
+        user_id = str(user_id)
 
         if user_id not in self.data["user_stats"]:
             self.data["user_stats"][user_id] = {
@@ -91,36 +87,36 @@ class Counting(commands.Cog):
             self.data["user_stats"][user_id]["wrong_counts"] += 1
 
         self.data["user_stats"][user_id]["last_updated"] = discord.utils.utcnow().isoformat()
-        self.data["user_stats"][user_id]["username"] = username  # Update username in case it changed
+        self.data["user_stats"][user_id]["username"] = username
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        # Ignore if not in counting channel
+
         if message.channel.id != COUNTING_CHANNEL_ID:
             return
 
-        # Ignore bot messages
+
         if message.author.bot:
             return
 
-        # Check if user has admin permissions
+
         is_admin = message.author.guild_permissions.administrator
 
-        # Try to parse the message content as a number
+
         try:
             count = int(message.content.strip())
         except ValueError:
-            # Not a number, delete if not admin
+
             if not is_admin:
                 try:
-                    # Nejprve smažeme původní zprávu
+
                     await message.delete()
 
-                    # Pošleme soukromou zprávu uživateli
+
                     try:
                         await message.author.send(f"V kanálu pro počítání jsou povolena pouze čísla. Vaše zpráva byla smazána.")
                     except:
-                        # Pokud nelze poslat DM, použijeme krátkou zprávu v kanálu
+
                         await message.channel.send(
                             f"<@{message.author.id}> V tomto kanálu jsou povolena pouze čísla.",
                             delete_after=2
@@ -132,54 +128,47 @@ class Counting(commands.Cog):
                     print(f"Error handling non-number message: {e}")
                 return
             else:
-                # Admin sent non-number message, ignore for counting
+
                 return
 
         expected_count = self.data["current_count"] + 1
 
-        # Check if the same user is counting twice in a row
+
         if message.author.id == self.data["last_user_id"]:
             await message.add_reaction("❌")
             await message.channel.send(f"**{message.author.display_name}**, nemůžeš počítat dvakrát za sebou! Počítání začíná znovu od 1.")
             self.data["current_count"] = 0
             self.data["last_user_id"] = None
             self.data["failed_counts"] += 1
-            # Update user stats - failed count
+
             self.update_user_stats(message.author.id, message.author.display_name, success=False)
             self.save_data()
             await self.update_channel_topic()
             return
 
-        # Check if the count is correct
         if count == expected_count:
-            # Correct count
             await message.add_reaction("✅")
             self.data["current_count"] = count
             self.data["last_user_id"] = message.author.id
 
-            # Update user stats - successful count
             self.update_user_stats(message.author.id, message.author.display_name, success=True)
 
-            # Update high score if needed
             if count > self.data["high_score"]:
                 self.data["high_score"] = count
-                if count % 10 == 0:  # Milestone every 10 counts
+                if count % 10 == 0:
                     await message.channel.send(f"🎉 Nový rekord: **{count}**! Gratulujeme!")
 
-            # Special milestone messages
             if count % 100 == 0:
                 await message.channel.send(f"🎊 **Dosáhli jste {count}!** Skvělá práce!")
 
             self.save_data()
             await self.update_channel_topic()
         else:
-            # Incorrect count
             await message.add_reaction("❌")
             await message.channel.send(f"**{message.author.display_name}** pokazil počítání na **{count}**! Správné číslo bylo **{expected_count}**. Počítání začíná znovu od 1.")
             self.data["current_count"] = 0
             self.data["last_user_id"] = None
             self.data["failed_counts"] += 1
-            # Update user stats - failed count
             self.update_user_stats(message.author.id, message.author.display_name, success=False)
             self.save_data()
             await self.update_channel_topic()

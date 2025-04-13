@@ -67,8 +67,8 @@ AI Strejda Discord Bot is a versatile Discord bot designed to enhance your serve
    - Welcome Channel ID
    - YouTube API Key (if using YouTube notifications)
    - YouTube Channel ID
-   - YouTube Notification Channel ID
-   - Counting Channel ID (for the counting game)
+
+   Note: You can use the `!setup` command to automatically create and configure the YouTube notification channel and counting channel.
 
 ## Configuration
 
@@ -106,6 +106,9 @@ python bot.py
 - `!countstats` - Display the top 10 users in the counting game with statistics
 - `!countrules` - Show the rules of the counting game
 - `!countreset` - Reset the counting game (admin only)
+- `!setupyoutube` - Create and configure a YouTube notification channel (admin only)
+- `!setupcounting` - Create and configure a counting game channel (admin only)
+- `!setup` - Run both setup commands at once (admin only)
 - `!shutdown` - Shutdown the bot (owner only)
 
 ## Project Structure
@@ -116,6 +119,7 @@ python bot.py
   - `bot_activity.py` - Bot status functionality
   - `youtube_video_ping.py` - YouTube notification functionality
   - `counting.py` - Counting game functionality
+  - `setup.py` - Automatic channel setup functionality
 - `utils/` - Utility modules:
   - `db.py` - Database functionality for storing video information
 - `db/` - Directory for JSON database files
@@ -198,8 +202,8 @@ AI Strejda Discord Bot je všestranný Discord bot navržený pro vylepšení va
    - ID kanálu pro uvítací zprávy
    - YouTube API klíč (pokud používáte YouTube oznámení)
    - ID YouTube kanálu
-   - ID kanálu pro YouTube oznámení
-   - ID kanálu pro hru na počítání
+
+   Poznámka: Můžete použít příkaz `!setup` k automatickému vytvoření a konfiguraci kanálu pro YouTube oznámení a kanálu pro hru na počítání.
 
 ## Konfigurace
 
@@ -237,6 +241,9 @@ python bot.py
 - `!countstats` - Zobrazí top 10 uživatelů ve hře na počítání se statistikami
 - `!countrules` - Zobrazí pravidla hry na počítání
 - `!countreset` - Resetuje hru na počítání (pouze admin)
+- `!setupyoutube` - Vytvoří a nakonfiguruje kanál pro YouTube oznámení (pouze admin)
+- `!setupcounting` - Vytvoří a nakonfiguruje kanál pro hru na počítání (pouze admin)
+- `!setup` - Spustí oba setup příkazy najednou (pouze admin)
 - `!shutdown` - Vypne bota (pouze vlastník)
 
 ## Struktura projektu
@@ -247,6 +254,7 @@ python bot.py
   - `bot_activity.py` - Funkcionalita statusu bota
   - `youtube_video_ping.py` - Funkcionalita YouTube oznámení
   - `counting.py` - Funkcionalita hry na počítání
+  - `setup.py` - Funkcionalita automatického nastavení kanálů
 - `utils/` - Užitečné moduly:
   - `db.py` - Databázová funkcionalita pro ukládání informací o videích
 - `db/` - Adresář pro JSON databázové soubory

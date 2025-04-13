@@ -181,7 +181,7 @@ class YouTubePing(commands.Cog):
                 print(f"First run, setting last video ID to {self.last_video_id} from database")
             else:
                 self.last_video_id = video['id']
-                print(f"First run, setting last video ID to {video['id']} (no previous videos in database)")
+                print(f"First run, setting last video ID to {video['id']}")
             return
 
         if video['id'] != self.last_video_id:
