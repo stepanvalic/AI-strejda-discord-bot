@@ -113,7 +113,7 @@ python bot.py
 - `!prikazy` or `!commands` - Lists all available commands
 - `!setupyoutube` - Create and configure a YouTube notification channel (admin only)
 - `!setupcounting` - Create and configure a counting game channel (admin only)
-- `!setup` - Run both setup commands at once (admin only) - **USE AT YOUR OWN RISK**
+- `!setup` - Run both setup commands at once (admin only)
 - `!shutdown` - Shutdown the bot (owner only)
 
 ## Project Structure
@@ -209,9 +209,7 @@ AI Strejda Discord Bot je všestranný Discord bot navržený pro vylepšení va
    - YouTube API klíč (pokud používáte YouTube oznámení)
    - ID YouTube kanálu
 
-   Poznámka: Můžete použít příkaz `!setup` k automatickému vytvoření a konfiguraci kanálu pro YouTube oznámení a kanálu pro hru na počítání. **POUŽITÍ NA VLASTNÍ NEBEZPEČÍ!** Příkaz již neupravuje .env soubor automaticky, musíte ID kanálů přidat ručně.
-
-   **Důležité:** ID kanálů v .env souboru musí být bez uvozovek! Například: `COUNTING_CHANNEL_ID=1234567890123456789`
+   Poznámka: Můžete použít příkaz `!setup` k automatickému vytvoření a konfiguraci kanálu pro YouTube oznámení a kanálu pro hru na počítání. Příkaz automaticky přidá ID kanálů do .env souboru.
 
 ## Konfigurace
 
@@ -256,7 +254,7 @@ python bot.py
 - `!prikazy` nebo `!commands` - Zobrazí seznam všech dostupných příkazů
 - `!setupyoutube` - Vytvoří a nakonfiguruje kanál pro YouTube oznámení (pouze admin)
 - `!setupcounting` - Vytvoří a nakonfiguruje kanál pro hru na počítání (pouze admin)
-- `!setup` - Spustí oba setup příkazy najednou (pouze admin) - **POUŽITÍ NA VLASTNÍ NEBEZPEČÍ!**
+- `!setup` - Spustí oba setup příkazy najednou (pouze admin)
 - `!shutdown` - Vypne bota (pouze vlastník)
 
 ## Struktura projektu

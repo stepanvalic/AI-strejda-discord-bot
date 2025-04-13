@@ -1,9 +1,10 @@
 import os
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 
 load_dotenv()
+ENV_FILE = '.env'
 
 class Setup(commands.Cog):
     def __init__(self, bot):
@@ -28,6 +29,8 @@ class Setup(commands.Cog):
                 topic="YouTube oznámení o nových videích"
             )
 
+            set_key(ENV_FILE, "YOUTUBE_NOTIFICATION_CHANNEL_ID", str(channel.id))
+
             embed = discord.Embed(
                 title="✅ YouTube kanál vytvořen",
                 description=f"Kanál {channel.mention} byl úspěšně vytvořen a nastaven pro YouTube oznámení.",
@@ -36,7 +39,7 @@ class Setup(commands.Cog):
 
             embed.add_field(
                 name="Nastavení",
-                value=f"ID kanálu: `{channel.id}`\nPřidejte toto ID do vašeho .env souboru jako YOUTUBE_NOTIFICATION_CHANNEL_ID=**{channel.id}** (bez uvozovek!)."
+                value=f"ID kanálu: `{channel.id}`\nID bylo automaticky přidáno do .env souboru."
             )
 
             await ctx.send(embed=embed, ephemeral=True)
@@ -57,6 +60,8 @@ class Setup(commands.Cog):
                 topic="Počítejte od 1 do nekonečna. Další číslo: 1"
             )
 
+            set_key(ENV_FILE, "COUNTING_CHANNEL_ID", str(channel.id))
+
             embed = discord.Embed(
                 title="✅ Counting kanál vytvořen",
                 description=f"Kanál {channel.mention} byl úspěšně vytvořen a nastaven pro hru na počítání.",
@@ -65,7 +70,7 @@ class Setup(commands.Cog):
 
             embed.add_field(
                 name="Nastavení",
-                value=f"ID kanálu: `{channel.id}`\nPřidejte toto ID do vašeho .env souboru jako COUNTING_CHANNEL_ID=**{channel.id}** (bez uvozovek!)."
+                value=f"ID kanálu: `{channel.id}`\nID bylo automaticky přidáno do .env souboru."
             )
 
             await ctx.send(embed=embed, ephemeral=True)
@@ -80,24 +85,20 @@ class Setup(commands.Cog):
         await self.setup_counting(ctx)
 
         embed = discord.Embed(
-            title="⚠️ Nastavení dokončeno",
-            description="Všechny kanály byly úspěšně vytvořeny, ale je potřeba je ručně nastavit v .env souboru.",
-            color=discord.Color.gold()
+            title="✅ Nastavení dokončeno",
+            description="Všechny kanály byly úspěšně vytvořeny a nastaveny v .env souboru.",
+            color=discord.Color.green()
         )
 
         embed.add_field(
-            name="⚠️ DŮLEŽITÉ UPOZORNĚNÍ",
-            value="Příkaz setup je na vlastní nebezpečí! Nezapomeňte ručně nastavit ID kanálů v .env souboru.\n\n"
-                  "Nezapomeňte nastavit následující proměnné v .env souboru:\n"
+            name="Nastavení",
+            value="ID kanálů byla automaticky přidána do .env souboru.\n\n"
+                  "Nezapomeňte nastavit ostatní proměnné v .env souboru:\n"
                   "- DISCORD_TOKEN\n"
                   "- GUILD_ID\n"
                   "- WELCOME_CHANNEL_ID\n"
                   "- YOUTUBE_API_KEY\n"
-                  "- YOUTUBE_CHANNEL_ID\n"
-                  "- YOUTUBE_NOTIFICATION_CHANNEL_ID (bez uvozovek!)\n"
-                  "- COUNTING_CHANNEL_ID (bez uvozovek!)\n\n"
-                  "Příklad správného formátu:\n"
-                  "COUNTING_CHANNEL_ID=1234567890123456789"
+                  "- YOUTUBE_CHANNEL_ID"
         )
 
         await ctx.send(embed=embed, ephemeral=True)
