@@ -65,6 +65,10 @@ async def load_extensions():
     await bot.load_extension("cogs.utility")
     print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}utility{Fore.MAGENTA} cog")
 
+    # Modul update_checker je deaktivován a bude zprovozněn později
+    # await bot.load_extension("cogs.update_checker")
+    # print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}update_checker{Fore.MAGENTA} cog")
+
 async def main():
     async with bot:
         await load_extensions()
