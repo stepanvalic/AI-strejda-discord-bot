@@ -54,7 +54,7 @@ class Utility(commands.Cog):
 
         embed = discord.Embed(
             title="💧 Kanál s nejlepší flow",
-            description=f"V tomto odpadním kanálu {channel.mention} teče ta nejlepší flow! Strejda by byl pyšný.",
+            description=f"V tomto kanálu {channel.mention} teče ta nejlepší flow! Strejda by byl pyšný.",
             color=discord.Color.blue()
         )
 
