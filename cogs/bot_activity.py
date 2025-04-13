@@ -33,13 +33,6 @@ class BotActivity(commands.Cog):
     async def before_change_status(self):
         await self.bot.wait_until_ready()
 
-    @commands.command(name="setstatus")
-    @commands.has_permissions(administrator=True)
-    async def set_status(self, ctx, *, new_status: str):
-        global ACTIVITY_BASE_TEXT
-        ACTIVITY_BASE_TEXT = new_status
-        await self.change_status()
-        await ctx.send(f"Status changed to: {new_status}")
 
 async def setup(bot):
     await bot.add_cog(BotActivity(bot))

@@ -1,5 +1,20 @@
 # AI Strejda Discord Bot
 
+## Table of Contents
+- [Overview](#overview)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Configuration](#configuration)
+  - [Discord Bot Setup](#discord-bot-setup)
+  - [YouTube API Setup](#youtube-api-setup-for-youtube-notifications)
+- [Usage](#usage)
+  - [Commands](#commands)
+- [Project Structure](#project-structure)
+- [Extending the Bot](#extending-the-bot)
+- [License](#license)
+- [Česká verze](#ai-strejda-discord-bot-česky)
+
 [Česká verze níže](#ai-strejda-discord-bot-česky)
 
 ## Overview
@@ -83,7 +98,6 @@ python bot.py
 ### Commands
 
 - `!welcome [@user]` - Manually send a welcome message for a user (admin only)
-- `!setstatus [text]` - Change the bot's status text (admin only)
 - `!checkyoutube` - Manually check for the latest YouTube video (admin only)
 - `!updatevideos` - Manually update all video embeds (admin only)
 - `!shutdown` - Shutdown the bot (owner only)
@@ -112,6 +126,20 @@ This project is open source and available under the [MIT License](LICENSE).
 ---
 
 # AI Strejda Discord Bot (Česky)
+
+## Obsah
+- [Přehled](#přehled)
+- [Funkce](#funkce)
+- [Požadavky](#požadavky)
+- [Instalace](#instalace)
+- [Konfigurace](#konfigurace)
+  - [Nastavení Discord Bota](#nastavení-discord-bota)
+  - [Nastavení YouTube API](#nastavení-youtube-api-pro-youtube-oznámení)
+- [Použití](#použití)
+  - [Příkazy](#příkazy)
+- [Struktura projektu](#struktura-projektu)
+- [Rozšíření bota](#rozšíření-bota)
+- [Licence](#licence)
 
 ## Přehled
 
@@ -194,7 +222,6 @@ python bot.py
 ### Příkazy
 
 - `!welcome [@uživatel]` - Ručně odešle uvítací zprávu pro uživatele (pouze admin)
-- `!setstatus [text]` - Změní text statusu bota (pouze admin)
 - `!checkyoutube` - Ručně zkontroluje nejnovější YouTube video (pouze admin)
 - `!updatevideos` - Ručně aktualizuje všechny video embedy (pouze admin)
 - `!shutdown` - Vypne bota (pouze vlastník)
