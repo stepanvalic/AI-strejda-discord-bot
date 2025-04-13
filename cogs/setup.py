@@ -1,10 +1,28 @@
 import os
 import discord
+import re
 from discord.ext import commands
-from dotenv import load_dotenv, set_key
+from dotenv import load_dotenv
 
 load_dotenv()
 ENV_FILE = '.env'
+
+def set_env_value(file_path, key, value):
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    key_exists = False
+    for i, line in enumerate(lines):
+        if re.match(f'^{key}=.*', line):
+            lines[i] = f'{key}={value}\n'
+            key_exists = True
+            break
+
+    if not key_exists:
+        lines.append(f'{key}={value}\n')
+
+    with open(file_path, 'w') as file:
+        file.writelines(lines)
 
 class Setup(commands.Cog):
     def __init__(self, bot):
@@ -29,7 +47,7 @@ class Setup(commands.Cog):
                 topic="YouTube oznámení o nových videích"
             )
 
-            set_key(ENV_FILE, "YOUTUBE_NOTIFICATION_CHANNEL_ID", str(channel.id))
+            set_env_value(ENV_FILE, "YOUTUBE_NOTIFICATION_CHANNEL_ID", str(channel.id))
 
             embed = discord.Embed(
                 title="✅ YouTube kanál vytvořen",
@@ -60,7 +78,7 @@ class Setup(commands.Cog):
                 topic="Počítejte od 1 do nekonečna. Další číslo: 1"
             )
 
-            set_key(ENV_FILE, "COUNTING_CHANNEL_ID", str(channel.id))
+            set_env_value(ENV_FILE, "COUNTING_CHANNEL_ID", str(channel.id))
 
             embed = discord.Embed(
                 title="✅ Counting kanál vytvořen",
