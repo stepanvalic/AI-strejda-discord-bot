@@ -26,7 +26,8 @@ AI Strejda Discord Bot is a versatile Discord bot designed to enhance your serve
 - **Welcome Messages**: Automatically sends personalized welcome embeds when new members join your server
 - **YouTube Notifications**: Monitors your YouTube channel and sends notifications with rich embeds when new videos are uploaded
 - **Dynamic Status**: Displays the current member count in the bot's status
-- **Database Storage**: Uses JSON files to store information about announced videos
+- **Counting Game**: Provides a fun counting game where users count up from 1 to infinity with rules and statistics
+- **Database Storage**: Uses JSON files to store information about announced videos and counting statistics
 - **Automatic Updates**: Regularly updates YouTube video embeds with current view and like counts
 
 ## Requirements
@@ -67,6 +68,7 @@ AI Strejda Discord Bot is a versatile Discord bot designed to enhance your serve
    - YouTube API Key (if using YouTube notifications)
    - YouTube Channel ID
    - YouTube Notification Channel ID
+   - Counting Channel ID (for the counting game)
 
 ## Configuration
 
@@ -100,6 +102,10 @@ python bot.py
 - `!welcome [@user]` - Manually send a welcome message for a user (admin only)
 - `!checkyoutube` - Manually check for the latest YouTube video (admin only)
 - `!updatevideos` - Manually update all video embeds (admin only)
+- `!count` - Show the current counting status and next number
+- `!countstats` - Display the top 10 users in the counting game with statistics
+- `!countrules` - Show the rules of the counting game
+- `!countreset` - Reset the counting game (admin only)
 - `!shutdown` - Shutdown the bot (owner only)
 
 ## Project Structure
@@ -109,6 +115,7 @@ python bot.py
   - `welcome.py` - Welcome message functionality
   - `bot_activity.py` - Bot status functionality
   - `youtube_video_ping.py` - YouTube notification functionality
+  - `counting.py` - Counting game functionality
 - `utils/` - Utility modules:
   - `db.py` - Database functionality for storing video information
 - `db/` - Directory for JSON database files
@@ -150,7 +157,8 @@ AI Strejda Discord Bot je všestranný Discord bot navržený pro vylepšení va
 - **Uvítací zprávy**: Automaticky odesílá personalizované uvítací embedy, když se na server připojí noví členové
 - **YouTube oznámení**: Sleduje váš YouTube kanál a odesílá oznámení s bohatými embedy, když jsou nahrána nová videa
 - **Dynamický status**: Zobrazuje aktuální počet členů ve statusu bota
-- **Ukládání dat**: Používá JSON soubory pro ukládání informací o oznámených videích
+- **Hra na počítání**: Poskytuje zábavnou hru, kde uživatelé počítají od 1 do nekonečna s pravidly a statistikami
+- **Ukládání dat**: Používá JSON soubory pro ukládání informací o oznámených videích a statistikách počítání
 - **Automatické aktualizace**: Pravidelně aktualizuje YouTube embedy s aktuálními počty zhlédnutí a lajků
 
 ## Požadavky
@@ -191,6 +199,7 @@ AI Strejda Discord Bot je všestranný Discord bot navržený pro vylepšení va
    - YouTube API klíč (pokud používáte YouTube oznámení)
    - ID YouTube kanálu
    - ID kanálu pro YouTube oznámení
+   - ID kanálu pro hru na počítání
 
 ## Konfigurace
 
@@ -224,6 +233,10 @@ python bot.py
 - `!welcome [@uživatel]` - Ručně odešle uvítací zprávu pro uživatele (pouze admin)
 - `!checkyoutube` - Ručně zkontroluje nejnovější YouTube video (pouze admin)
 - `!updatevideos` - Ručně aktualizuje všechny video embedy (pouze admin)
+- `!count` - Zobrazí aktuální stav počítání a další číslo
+- `!countstats` - Zobrazí top 10 uživatelů ve hře na počítání se statistikami
+- `!countrules` - Zobrazí pravidla hry na počítání
+- `!countreset` - Resetuje hru na počítání (pouze admin)
 - `!shutdown` - Vypne bota (pouze vlastník)
 
 ## Struktura projektu
@@ -233,6 +246,7 @@ python bot.py
   - `welcome.py` - Funkcionalita uvítacích zpráv
   - `bot_activity.py` - Funkcionalita statusu bota
   - `youtube_video_ping.py` - Funkcionalita YouTube oznámení
+  - `counting.py` - Funkcionalita hry na počítání
 - `utils/` - Užitečné moduly:
   - `db.py` - Databázová funkcionalita pro ukládání informací o videích
 - `db/` - Adresář pro JSON databázové soubory

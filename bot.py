@@ -52,6 +52,9 @@ async def load_extensions():
     await bot.load_extension("cogs.youtube_video_ping")
     print("Loaded youtube video ping cog")
 
+    await bot.load_extension("cogs.counting")
+    print("Loaded counting cog")
+
 async def main():
     async with bot:
         await load_extensions()
