@@ -1,0 +1,13 @@
+# Environment variables
+.env
+
+# Python virtual environment
+venv/
+env/
+
+# Database files
+db/*.json
+
+# OS specific files
+.DS_Store
+Thumbs.db
