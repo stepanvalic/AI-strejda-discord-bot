@@ -42,21 +42,23 @@ class Utility(commands.Cog):
 
     @commands.command(name="kanal")
     async def youtube_notification_channel(self, ctx):
-        """Zobrazí kanál, kam tečou YouTube notifikace"""
+        """Zobrazí kanál, kam teče nejlepší flow"""
         if YOUTUBE_NOTIFICATION_CHANNEL_ID == 0:
-            await ctx.send("YouTube notifikační kanál není nastaven v .env souboru.", ephemeral=True)
+            await ctx.send("Kanál s nejlepší flow není nastaven v .env souboru.", ephemeral=True)
             return
 
         channel = self.bot.get_channel(YOUTUBE_NOTIFICATION_CHANNEL_ID)
         if not channel:
-            await ctx.send("YouTube notifikační kanál nebyl nalezen.", ephemeral=True)
+            await ctx.send("Kanál s nejlepší flow nebyl nalezen. Asi někdo vypnul vodovod!", ephemeral=True)
             return
 
         embed = discord.Embed(
-            title="YouTube notifikační kanál",
-            description=f"YouTube notifikace jsou posílány do kanálu {channel.mention}",
-            color=discord.Color.red()
+            title="💧 Kanál s nejlepší flow",
+            description=f"V tomto odpadním kanálu {channel.mention} teče ta nejlepší flow! Strejda by byl pyšný.",
+            color=discord.Color.blue()
         )
+
+        embed.set_footer(text="Pozor, vysoké riziko zatopit si boty!")
 
         await ctx.send(embed=embed, ephemeral=True)
 

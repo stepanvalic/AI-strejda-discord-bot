@@ -107,13 +107,11 @@ python bot.py
 - `!countrules` - Show the rules of the counting game
 - `!countreset` - Reset the counting game (admin only)
 - `!yt` or `!youtube` - Shows the YouTube channel link
-- `!kanal` - Shows the YouTube notification channel
+- `!kanal` - Shows the channel with the best flow
 - `!uptime` - Shows how long the bot has been running
 - `!discord` or `!dc` - Generates a Discord server invite
 - `!prikazy` or `!commands` - Lists all available commands
-- `!setupyoutube` - Create and configure a YouTube notification channel (admin only)
-- `!setupcounting` - Create and configure a counting game channel (admin only)
-- `!setup` - Run both setup commands at once (admin only)
+# Setup commands have been disabled
 - `!shutdown` - Shutdown the bot (owner only)
 
 ## Project Structure
@@ -209,7 +207,7 @@ AI Strejda Discord Bot je všestranný Discord bot navržený pro vylepšení va
    - YouTube API klíč (pokud používáte YouTube oznámení)
    - ID YouTube kanálu
 
-   Poznámka: Můžete použít příkaz `!setup` k automatickému vytvoření a konfiguraci kanálu pro YouTube oznámení a kanálu pro hru na počítání. Příkaz automaticky přidá ID kanálů do .env souboru.
+   Poznámka: Setup příkazy byly deaktivovány. Kanály je nyní potřeba vytvořit ručně a ID přidat do .env souboru.
 
 ## Konfigurace
 
@@ -248,13 +246,11 @@ python bot.py
 - `!countrules` - Zobrazí pravidla hry na počítání
 - `!countreset` - Resetuje hru na počítání (pouze admin)
 - `!yt` nebo `!youtube` - Zobrazí odkaz na YouTube kanál
-- `!kanal` - Zobrazí kanál pro YouTube notifikace
+- `!kanal` - Zobrazí kanál s nejlepší flow
 - `!uptime` - Zobrazí, jak dlouho je bot online
 - `!discord` nebo `!dc` - Vygeneruje pozvánku na Discord server
 - `!prikazy` nebo `!commands` - Zobrazí seznam všech dostupných příkazů
-- `!setupyoutube` - Vytvoří a nakonfiguruje kanál pro YouTube oznámení (pouze admin)
-- `!setupcounting` - Vytvoří a nakonfiguruje kanál pro hru na počítání (pouze admin)
-- `!setup` - Spustí oba setup příkazy najednou (pouze admin)
+# Setup příkazy byly deaktivovány
 - `!shutdown` - Vypne bota (pouze vlastník)
 
 ## Struktura projektu
