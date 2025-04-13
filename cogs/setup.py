@@ -36,7 +36,7 @@ class Setup(commands.Cog):
 
             embed.add_field(
                 name="Nastavení",
-                value=f"ID kanálu: `{channel.id}`\nPřidejte toto ID do vašeho .env souboru jako YOUTUBE_NOTIFICATION_CHANNEL_ID."
+                value=f"ID kanálu: `{channel.id}`\nPřidejte toto ID do vašeho .env souboru jako YOUTUBE_NOTIFICATION_CHANNEL_ID=**{channel.id}** (bez uvozovek!)."
             )
 
             await ctx.send(embed=embed, ephemeral=True)
@@ -65,7 +65,7 @@ class Setup(commands.Cog):
 
             embed.add_field(
                 name="Nastavení",
-                value=f"ID kanálu: `{channel.id}`\nPřidejte toto ID do vašeho .env souboru jako COUNTING_CHANNEL_ID."
+                value=f"ID kanálu: `{channel.id}`\nPřidejte toto ID do vašeho .env souboru jako COUNTING_CHANNEL_ID=**{channel.id}** (bez uvozovek!)."
             )
 
             await ctx.send(embed=embed, ephemeral=True)
@@ -94,8 +94,10 @@ class Setup(commands.Cog):
                   "- WELCOME_CHANNEL_ID\n"
                   "- YOUTUBE_API_KEY\n"
                   "- YOUTUBE_CHANNEL_ID\n"
-                  "- YOUTUBE_NOTIFICATION_CHANNEL_ID\n"
-                  "- COUNTING_CHANNEL_ID"
+                  "- YOUTUBE_NOTIFICATION_CHANNEL_ID (bez uvozovek!)\n"
+                  "- COUNTING_CHANNEL_ID (bez uvozovek!)\n\n"
+                  "Příklad správného formátu:\n"
+                  "COUNTING_CHANNEL_ID=1234567890123456789"
         )
 
         await ctx.send(embed=embed, ephemeral=True)

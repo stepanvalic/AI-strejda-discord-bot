@@ -211,6 +211,8 @@ AI Strejda Discord Bot je všestranný Discord bot navržený pro vylepšení va
 
    Poznámka: Můžete použít příkaz `!setup` k automatickému vytvoření a konfiguraci kanálu pro YouTube oznámení a kanálu pro hru na počítání. **POUŽITÍ NA VLASTNÍ NEBEZPEČÍ!** Příkaz již neupravuje .env soubor automaticky, musíte ID kanálů přidat ručně.
 
+   **Důležité:** ID kanálů v .env souboru musí být bez uvozovek! Například: `COUNTING_CHANNEL_ID=1234567890123456789`
+
 ## Konfigurace
 
 ### Nastavení Discord Bota
