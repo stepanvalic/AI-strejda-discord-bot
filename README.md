@@ -27,7 +27,8 @@ AI Strejda Discord Bot is a versatile Discord bot designed to enhance your serve
 - **YouTube Notifications**: Monitors your YouTube channel and sends notifications with rich embeds when new videos are uploaded
 - **Dynamic Status**: Displays the current member count in the bot's status
 - **Counting Game**: Provides a fun counting game where users count up from 1 to infinity with rules and statistics
-- **Database Storage**: Uses JSON files to store information about announced videos and counting statistics
+- **AI Moderation**: Uses Google Gemini AI to analyze message sentiment, reward positive behavior with multiple role levels (800/2000/5000 points), and penalize negative behavior with timeouts and roles (-30/-1000 points)
+- **Database Storage**: Uses JSON files to store information about announced videos, counting statistics, and user behavior
 - **Automatic Updates**: Regularly updates YouTube video embeds with current view and like counts
 
 ## Requirements
@@ -35,6 +36,7 @@ AI Strejda Discord Bot is a versatile Discord bot designed to enhance your serve
 - Python 3.8 or higher
 - Discord Bot Token
 - YouTube API Key (for YouTube notifications)
+- Google Gemini API Key (for AI moderation)
 - Discord server with appropriate permissions
 
 ## Installation
@@ -99,23 +101,39 @@ python bot.py
 
 ### Commands
 
-- `!welcome [@user]` - Manually send a welcome message for a user (admin only)
+#### Utility Commands
+- `!uptime` - Shows how long the bot has been running
+- `!discord` or `!dc` - Generates a Discord server invite
+- `!prikazy` or `!commands` - Lists all available commands
+
+#### YouTube Commands
+- `!yt` or `!youtube` - Shows the YouTube channel link
+- `!kanal` - Shows the channel with the best flow
 - `!checkyoutube` - Manually check for the latest YouTube video (admin only)
 - `!updatevideos` - Manually update all video embeds (admin only)
-- `!timeout [@user] [time]` - Timeout a user for the specified time (admin only). Time format: 5s, 3m, 2h, 1d, 1y or combinations like 1d12h30m (maximum 28 days due to Discord limit)
-- `!untimeout` or `!unmute [@user]` - Remove timeout from a user (admin only)
-- `!ban [@user] [reason]` - Permanently ban a user with optional reason (admin only)
-- `!unban [user_id]` - Unban a user by their ID (admin only)
+
+#### Counting Game Commands
 - `!count` - Show the current counting status and next number
 - `!countstats` - Display the top 10 users in the counting game with statistics
 - `!countrules` - Show the rules of the counting game
 - `!countreset` - Reset the counting game (admin only)
-- `!yt` or `!youtube` - Shows the YouTube channel link
-- `!kanal` - Shows the channel with the best flow
-- `!uptime` - Shows how long the bot has been running
-- `!discord` or `!dc` - Generates a Discord server invite
-- `!prikazy` or `!commands` - Lists all available commands
-# Setup commands have been disabled
+
+#### AI Moderation Commands
+- `!aiscore [@user]` - Shows the AI sentiment score for yourself or a mentioned user
+- `!aitop` - Shows the top 10 users with the highest AI sentiment scores
+- `!aibottom` - Shows the 10 users with the lowest AI sentiment scores
+- `!airules` - Shows the rules and thresholds of the AI moderation system (admin only)
+- `!aireset [@user]` - Resets the AI score for a specific user (admin only)
+- `!airesetall` - Resets the AI scores for all users (admin only)
+
+#### Moderation Commands
+- `!timeout [@user] [time]` - Timeout a user for the specified time (admin only). Time format: 5s, 3m, 2h, 1d, 1y or combinations like 1d12h30m (maximum 28 days due to Discord limit)
+- `!untimeout` or `!unmute [@user]` - Remove timeout from a user (admin only)
+- `!ban [@user] [reason]` - Permanently ban a user with optional reason (admin only)
+- `!unban [user_id]` - Unban a user by their ID (admin only)
+- `!welcome [@user]` - Manually send a welcome message for a user (admin only)
+
+#### System Commands
 - `!shutdown` - Shutdown the bot (owner only)
 
 ## Project Structure
@@ -129,11 +147,13 @@ python bot.py
   - `setup.py` - Automatic channel setup functionality
   - `utility.py` - Utility commands functionality
   - `moderation.py` - Moderation commands functionality
+  - `ai_moderation.py` - AI moderation functionality
 - `utils/` - Utility modules:
   - `db.py` - Database functionality for storing video information
 - `db/` - Directory for JSON database files
 - `.env` - Configuration file for bot settings
 - `requirements.txt` - Python dependencies
+- `AI_MODERATION_README.md` - Detailed documentation for the AI moderation feature
 
 ## Extending the Bot
 
@@ -171,7 +191,8 @@ AI Strejda Discord Bot je všestranný Discord bot navržený pro vylepšení va
 - **YouTube oznámení**: Sleduje váš YouTube kanál a odesílá oznámení s bohatými embedy, když jsou nahrána nová videa
 - **Dynamický status**: Zobrazuje aktuální počet členů ve statusu bota
 - **Hra na počítání**: Poskytuje zábavnou hru, kde uživatelé počítají od 1 do nekonečna s pravidly a statistikami
-- **Ukládání dat**: Používá JSON soubory pro ukládání informací o oznámených videích a statistikách počítání
+- **AI Moderace**: Používá Google Gemini AI k analýze sentimentu zpráv, odměňování pozitivního chování více úrovněmi rolí (800/2000/5000 bodů) a penalizaci negativního chování timeouty a rolemi (-30/-1000 bodů)
+- **Ukládání dat**: Používá JSON soubory pro ukládání informací o oznámených videích, statistikách počítání a chování uživatelů
 - **Automatické aktualizace**: Pravidelně aktualizuje YouTube embedy s aktuálními počty zhlédnutí a lajků
 
 ## Požadavky
@@ -179,6 +200,7 @@ AI Strejda Discord Bot je všestranný Discord bot navržený pro vylepšení va
 - Python 3.8 nebo vyšší
 - Discord Bot Token
 - YouTube API klíč (pro YouTube oznámení)
+- Google Gemini API klíč (pro AI moderaci)
 - Discord server s příslušnými oprávněními
 
 ## Instalace
@@ -243,23 +265,39 @@ python bot.py
 
 ### Příkazy
 
-- `!welcome [@uživatel]` - Ručně odešle uvítací zprávu pro uživatele (pouze admin)
+#### Užitečné příkazy
+- `!uptime` - Zobrazí, jak dlouho je bot online
+- `!discord` nebo `!dc` - Vygeneruje pozvánku na Discord server
+- `!prikazy` nebo `!commands` - Zobrazí seznam všech dostupných příkazů
+
+#### YouTube příkazy
+- `!yt` nebo `!youtube` - Zobrazí odkaz na YouTube kanál
+- `!kanal` - Zobrazí kanál s nejlepší flow
 - `!checkyoutube` - Ručně zkontroluje nejnovější YouTube video (pouze admin)
 - `!updatevideos` - Ručně aktualizuje všechny video embedy (pouze admin)
-- `!timeout [@uživatel] [čas]` - Dá uživateli timeout na určitou dobu (pouze admin). Formát času: 5s, 3m, 2h, 1d, 1y nebo kombinace např. 1d12h30m (maximum 28 dní kvůli omezení Discordu)
-- `!untimeout` nebo `!unmute [@uživatel]` - Zruší timeout uživateli (pouze admin)
-- `!ban [@uživatel] [důvod]` - Trvale zabanuje uživatele s volitelným důvodem (pouze admin)
-- `!unban [user_id]` - Odbanuje uživatele podle jeho ID (pouze admin)
+
+#### Počítací příkazy
 - `!count` - Zobrazí aktuální stav počítání a další číslo
 - `!countstats` - Zobrazí top 10 uživatelů ve hře na počítání se statistikami
 - `!countrules` - Zobrazí pravidla hry na počítání
 - `!countreset` - Resetuje hru na počítání (pouze admin)
-- `!yt` nebo `!youtube` - Zobrazí odkaz na YouTube kanál
-- `!kanal` - Zobrazí kanál s nejlepší flow
-- `!uptime` - Zobrazí, jak dlouho je bot online
-- `!discord` nebo `!dc` - Vygeneruje pozvánku na Discord server
-- `!prikazy` nebo `!commands` - Zobrazí seznam všech dostupných příkazů
-# Setup příkazy byly deaktivovány
+
+#### AI Moderace příkazy
+- `!aiscore [@uživatel]` - Zobrazí AI skóre sentimentu pro vás nebo zmíněného uživatele
+- `!aitop` - Zobrazí top 10 uživatelů s nejvyšším AI skóre sentimentu
+- `!aibottom` - Zobrazí 10 uživatelů s nejnižším AI skóre sentimentu
+- `!airules` - Zobrazí pravidla a hranice AI moderačního systému (pouze admin)
+- `!aireset [@uživatel]` - Resetuje AI skóre pro konkrétního uživatele (pouze admin)
+- `!airesetall` - Resetuje AI skóre pro všechny uživatele (pouze admin)
+
+#### Moderační příkazy
+- `!timeout [@uživatel] [čas]` - Dá uživateli timeout na určitou dobu (pouze admin). Formát času: 5s, 3m, 2h, 1d, 1y nebo kombinace např. 1d12h30m (maximum 28 dní kvůli omezení Discordu)
+- `!untimeout` nebo `!unmute [@uživatel]` - Zruší timeout uživateli (pouze admin)
+- `!ban [@uživatel] [důvod]` - Trvale zabanuje uživatele s volitelným důvodem (pouze admin)
+- `!unban [user_id]` - Odbanuje uživatele podle jeho ID (pouze admin)
+- `!welcome [@uživatel]` - Ručně odešle uvítací zprávu pro uživatele (pouze admin)
+
+#### Systémové příkazy
 - `!shutdown` - Vypne bota (pouze vlastník)
 
 ## Struktura projektu
@@ -273,11 +311,13 @@ python bot.py
   - `setup.py` - Funkcionalita automatického nastavení kanálů
   - `utility.py` - Funkcionalita užitečných příkazů
   - `moderation.py` - Funkcionalita moderačních příkazů
+  - `ai_moderation.py` - Funkcionalita AI moderace
 - `utils/` - Užitečné moduly:
   - `db.py` - Databázová funkcionalita pro ukládání informací o videích
 - `db/` - Adresář pro JSON databázové soubory
 - `.env` - Konfigurační soubor pro nastavení bota
 - `requirements.txt` - Python závislosti
+- `AI_MODERATION_README.md` - Detailní dokumentace pro funkci AI moderace
 
 ## Rozšíření bota
 

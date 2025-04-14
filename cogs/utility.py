@@ -129,7 +129,13 @@ class Utility(commands.Cog):
             color=discord.Color.green()
         )
 
-        all_commands = {}
+        # Kategorie příkazů
+        utility_commands = {}
+        moderation_commands = {}
+        counting_commands = {}
+        youtube_commands = {}
+        ai_commands = {}
+        other_commands = {}
         admin_commands = {}
 
         for command in self.bot.commands:
@@ -149,21 +155,40 @@ class Utility(commands.Cog):
                 aliases = ", !".join(command.aliases)
                 cmd_name += f" (nebo !{aliases})"
 
+            # Rozdělení příkazů do kategorií
             if requires_admin:
                 admin_commands[cmd_name] = cmd_desc
+            elif command.name in ["yt", "youtube", "kanal", "checkyoutube", "updatevideos"]:
+                youtube_commands[cmd_name] = cmd_desc
+            elif command.name in ["count", "countstats", "countrules", "countreset"]:
+                counting_commands[cmd_name] = cmd_desc
+            elif command.name in ["aiscore", "aitop", "aibottom", "airules", "aireset", "airesetall"]:
+                ai_commands[cmd_name] = cmd_desc
+            elif command.name in ["timeout", "untimeout", "unmute", "ban", "unban"]:
+                moderation_commands[cmd_name] = cmd_desc
+            elif command.name in ["uptime", "discord", "dc", "prikazy", "commands"]:
+                utility_commands[cmd_name] = cmd_desc
             else:
-                all_commands[cmd_name] = cmd_desc
+                other_commands[cmd_name] = cmd_desc
 
-        if all_commands:
+        # Funkce pro přidání kategorie příkazů do embedu
+        def add_commands_to_embed(commands_dict, category_name):
+            if not commands_dict:
+                return
+
             commands_text = ""
-            for cmd, desc in all_commands.items():
+            for cmd, desc in commands_dict.items():
                 commands_text += f"**{cmd}** - {desc}\n"
-            embed.add_field(name="Běžné příkazy", value=commands_text, inline=False)
-        if admin_commands:
-            admin_commands_text = ""
-            for cmd, desc in admin_commands.items():
-                admin_commands_text += f"**{cmd}** - {desc}\n"
-            embed.add_field(name="Admin příkazy", value=admin_commands_text, inline=False)
+            embed.add_field(name=category_name, value=commands_text, inline=False)
+
+        # Přidání kategorií do embedu
+        add_commands_to_embed(utility_commands, "Užitečné příkazy")
+        add_commands_to_embed(youtube_commands, "YouTube příkazy")
+        add_commands_to_embed(counting_commands, "Počítací příkazy")
+        add_commands_to_embed(ai_commands, "AI Moderace příkazy")
+        add_commands_to_embed(moderation_commands, "Moderační příkazy")
+        add_commands_to_embed(other_commands, "Ostatní příkazy")
+        add_commands_to_embed(admin_commands, "Admin příkazy")
 
         await ctx.send(embed=embed, ephemeral=True)
 
