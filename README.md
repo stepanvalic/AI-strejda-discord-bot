@@ -102,6 +102,10 @@ python bot.py
 - `!welcome [@user]` - Manually send a welcome message for a user (admin only)
 - `!checkyoutube` - Manually check for the latest YouTube video (admin only)
 - `!updatevideos` - Manually update all video embeds (admin only)
+- `!timeout [@user] [time]` - Timeout a user for the specified time (admin only). Time format: 5s, 3m, 2h, 1d, 1y or combinations like 1d12h30m (maximum 28 days due to Discord limit)
+- `!untimeout` or `!unmute [@user]` - Remove timeout from a user (admin only)
+- `!ban [@user] [reason]` - Permanently ban a user with optional reason (admin only)
+- `!unban [user_id]` - Unban a user by their ID (admin only)
 - `!count` - Show the current counting status and next number
 - `!countstats` - Display the top 10 users in the counting game with statistics
 - `!countrules` - Show the rules of the counting game
@@ -124,6 +128,7 @@ python bot.py
   - `counting.py` - Counting game functionality
   - `setup.py` - Automatic channel setup functionality
   - `utility.py` - Utility commands functionality
+  - `moderation.py` - Moderation commands functionality
 - `utils/` - Utility modules:
   - `db.py` - Database functionality for storing video information
 - `db/` - Directory for JSON database files
@@ -241,6 +246,10 @@ python bot.py
 - `!welcome [@uživatel]` - Ručně odešle uvítací zprávu pro uživatele (pouze admin)
 - `!checkyoutube` - Ručně zkontroluje nejnovější YouTube video (pouze admin)
 - `!updatevideos` - Ručně aktualizuje všechny video embedy (pouze admin)
+- `!timeout [@uživatel] [čas]` - Dá uživateli timeout na určitou dobu (pouze admin). Formát času: 5s, 3m, 2h, 1d, 1y nebo kombinace např. 1d12h30m (maximum 28 dní kvůli omezení Discordu)
+- `!untimeout` nebo `!unmute [@uživatel]` - Zruší timeout uživateli (pouze admin)
+- `!ban [@uživatel] [důvod]` - Trvale zabanuje uživatele s volitelným důvodem (pouze admin)
+- `!unban [user_id]` - Odbanuje uživatele podle jeho ID (pouze admin)
 - `!count` - Zobrazí aktuální stav počítání a další číslo
 - `!countstats` - Zobrazí top 10 uživatelů ve hře na počítání se statistikami
 - `!countrules` - Zobrazí pravidla hry na počítání
@@ -263,6 +272,7 @@ python bot.py
   - `counting.py` - Funkcionalita hry na počítání
   - `setup.py` - Funkcionalita automatického nastavení kanálů
   - `utility.py` - Funkcionalita užitečných příkazů
+  - `moderation.py` - Funkcionalita moderačních příkazů
 - `utils/` - Užitečné moduly:
   - `db.py` - Databázová funkcionalita pro ukládání informací o videích
 - `db/` - Adresář pro JSON databázové soubory
