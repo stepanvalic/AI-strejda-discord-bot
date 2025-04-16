@@ -7,6 +7,25 @@ from dotenv import load_dotenv
 load_dotenv()
 ENV_FILE = '.env'
 
+# Načtení ID kanálů z .env souboru
+try:
+    YOUTUBE_NOTIFICATION_CHANNEL_ID = int(os.getenv('YOUTUBE_NOTIFICATION_CHANNEL_ID', 0))
+except ValueError:
+    YOUTUBE_NOTIFICATION_CHANNEL_ID = 0
+    print("Warning: Invalid YOUTUBE_NOTIFICATION_CHANNEL_ID in .env file")
+
+try:
+    COUNTING_CHANNEL_ID = int(os.getenv('COUNTING_CHANNEL_ID', 0))
+except ValueError:
+    COUNTING_CHANNEL_ID = 0
+    print("Warning: Invalid COUNTING_CHANNEL_ID in .env file")
+
+try:
+    WELCOME_CHANNEL_ID = int(os.getenv('WELCOME_CHANNEL_ID', 0))
+except ValueError:
+    WELCOME_CHANNEL_ID = 0
+    print("Warning: Invalid WELCOME_CHANNEL_ID in .env file")
+
 def set_env_value(file_path, key, value):
     with open(file_path, 'r') as file:
         lines = file.readlines()
@@ -29,7 +48,6 @@ class Setup(commands.Cog):
         self.bot = bot
 
     # Všechny setup příkazy jsou zakomentovány a nejsou dostupné
-    """
     @commands.command(name="setupyoutube")
     @commands.has_permissions(administrator=True)
     async def setup_youtube(self, ctx):
@@ -135,6 +153,7 @@ class Setup(commands.Cog):
         await self.setup_youtube(ctx)
         await self.setup_counting(ctx)
         await self.setup_update(ctx)
+        await self.setup_audit_log(ctx)
 
         embed = discord.Embed(
             title="✅ Nastavení dokončeno",
@@ -154,7 +173,131 @@ class Setup(commands.Cog):
         )
 
         await ctx.send(embed=embed, ephemeral=True)
-    """
+
+    @commands.command(name="setup_audit")
+    @commands.has_permissions(administrator=True)
+    async def setup_audit_log(self, ctx):
+        # Vytvoříme kanál s oprávněními pouze pro administrátory
+        overwrites = {
+            ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            ctx.guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+        }
+
+        # Přidáme oprávnění pro role s admin právy
+        for role in ctx.guild.roles:
+            if role.permissions.administrator:
+                overwrites[role] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
+
+        try:
+            channel = await ctx.guild.create_text_channel(
+                name="audit-log",
+                overwrites=overwrites,
+                topic="Automatický audit log serveru"
+            )
+
+            # Aktualizujeme .env soubor
+            self.update_env_variable("AUDIT_LOG_CHANNEL_ID", str(channel.id))
+
+            await ctx.send(f"Vytvořen nový kanál pro audit log: {channel.mention}", ephemeral=True)
+
+            # Vyvoláme příkaz setupaudit v audit_log cogu
+            audit_cog = self.bot.get_cog("AuditLog")
+            if audit_cog:
+                await audit_cog.setup_audit(ctx, channel)
+
+        except discord.Forbidden:
+            await ctx.send("Nemám oprávnění vytvořit nový kanál.", ephemeral=True)
+        except discord.HTTPException as e:
+            await ctx.send(f"Nastala chyba při vytváření kanálu: {e}", ephemeral=True)
+
+    @commands.command(name="setup_perms")
+    @commands.has_permissions(administrator=True)
+    async def setup_perms(self, ctx):
+        # Smazání zprávy s příkazem
+        try:
+            await ctx.message.delete()
+        except Exception as e:
+            print(f"Chyba při mazání zprávy: {str(e)}")
+
+        guild = ctx.guild
+        success_messages = []
+        error_messages = []
+
+        # Nastavení oprávnění pro YouTube kanál
+        if YOUTUBE_NOTIFICATION_CHANNEL_ID != 0:
+            try:
+                youtube_channel = self.bot.get_channel(YOUTUBE_NOTIFICATION_CHANNEL_ID)
+                if youtube_channel:
+                    # Nastavení oprávnění: všichni vidí, pouze admin a bot mohou psát
+                    await youtube_channel.set_permissions(guild.default_role, send_messages=False, view_channel=True)
+                    await youtube_channel.set_permissions(guild.me, send_messages=True, view_channel=True)
+                    success_messages.append(f"✅ Oprávnění pro YouTube kanál {youtube_channel.mention} byla nastavena.")
+                else:
+                    error_messages.append("❌ YouTube kanál nebyl nalezen.")
+            except Exception as e:
+                error_messages.append(f"❌ Chyba při nastavování oprávnění pro YouTube kanál: {str(e)}")
+        else:
+            error_messages.append("❌ ID YouTube kanálu není nastaveno v .env souboru.")
+
+        # Nastavení oprávnění pro kanál na počítání
+        if COUNTING_CHANNEL_ID != 0:
+            try:
+                counting_channel = self.bot.get_channel(COUNTING_CHANNEL_ID)
+                if counting_channel:
+                    # Nastavení oprávnění: všichni vidí a mohou psát, ale s limitem 15 sekund
+                    await counting_channel.edit(slowmode_delay=15)
+                    await counting_channel.set_permissions(guild.default_role, send_messages=True, view_channel=True)
+                    success_messages.append(f"✅ Oprávnění pro kanál na počítání {counting_channel.mention} byla nastavena s limitem 15 sekund.")
+                else:
+                    error_messages.append("❌ Kanál na počítání nebyl nalezen.")
+            except Exception as e:
+                error_messages.append(f"❌ Chyba při nastavování oprávnění pro kanál na počítání: {str(e)}")
+        else:
+            error_messages.append("❌ ID kanálu na počítání není nastaveno v .env souboru.")
+
+        # Nastavení oprávnění pro welcome kanál
+        if WELCOME_CHANNEL_ID != 0:
+            try:
+                welcome_channel = self.bot.get_channel(WELCOME_CHANNEL_ID)
+                if welcome_channel:
+                    # Nastavení oprávnění: všichni vidí, pouze admin a bot mohou psát
+                    await welcome_channel.set_permissions(guild.default_role, send_messages=False, view_channel=True)
+                    await welcome_channel.set_permissions(guild.me, send_messages=True, view_channel=True)
+                    success_messages.append(f"✅ Oprávnění pro welcome kanál {welcome_channel.mention} byla nastavena.")
+                else:
+                    error_messages.append("❌ Welcome kanál nebyl nalezen.")
+            except Exception as e:
+                error_messages.append(f"❌ Chyba při nastavování oprávnění pro welcome kanál: {str(e)}")
+        else:
+            error_messages.append("❌ ID welcome kanálu není nastaveno v .env souboru.")
+
+        # Vytvoření a odeslání embedu s výsledky
+        embed = discord.Embed(
+            title="🔧 Nastavení oprávnění kanálů",
+            color=discord.Color.blue()
+        )
+
+        if success_messages:
+            embed.add_field(
+                name="✅ Úspěšné operace",
+                value="\n".join(success_messages),
+                inline=False
+            )
+
+        if error_messages:
+            embed.add_field(
+                name="❌ Chyby",
+                value="\n".join(error_messages),
+                inline=False
+            )
+
+        # Poslání zprávy přímo uživateli
+        try:
+            await ctx.author.send(embed=embed)
+        except Exception as e:
+            # Pokud nelze poslat DM, poslat zprávu do kanálu
+            print(f"Chyba při posílání DM: {str(e)}")
+            await ctx.send(f"{ctx.author.mention} Nastavení oprávnění bylo dokončeno.")
 
 async def setup(bot):
     await bot.add_cog(Setup(bot))

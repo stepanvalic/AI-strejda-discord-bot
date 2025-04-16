@@ -4,6 +4,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 import colorama
 from colorama import Fore, Back, Style
+from utils.permissions import check_permissions
 
 colorama.init(autoreset=True)
 
@@ -15,7 +16,8 @@ intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 
-bot = commands.Bot(command_prefix='!', intents=intents)
+# Vypnutí vestavěného help příkazu
+bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
 @bot.event
 async def on_ready():
@@ -31,6 +33,10 @@ async def on_ready():
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
+        return
+
+    # Kontrola oprávnění a poslání soukromé zprávy při nedostatku oprávnění
+    if await check_permissions(ctx, error):
         return
 
     if isinstance(error, commands.MissingRequiredArgument):
@@ -70,6 +76,12 @@ async def load_extensions():
 
     await bot.load_extension("cogs.ai_moderation")
     print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}ai_moderation{Fore.MAGENTA} cog")
+
+    await bot.load_extension("cogs.audit_log")
+    print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}audit_log{Fore.MAGENTA} cog")
+
+    await bot.load_extension("cogs.word_filter")
+    print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}word_filter{Fore.MAGENTA} cog")
 
     # Modul update_checker je deaktivován a bude zprovozněn později
     # await bot.load_extension("cogs.update_checker")

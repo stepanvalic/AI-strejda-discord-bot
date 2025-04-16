@@ -31,6 +31,8 @@ AI Strejda Discord Bot is a versatile Discord bot designed to enhance your serve
 - **Dynamic Status**: Displays the current member count in the bot's status
 - **Counting Game**: Provides a fun counting game where users count up from 1 to infinity with rules and statistics
 - **AI Moderation**: Uses Google Gemini AI to analyze message sentiment, reward positive behavior with multiple role levels (800/2000/5000 points), and penalize negative behavior with timeouts and roles (-30/-1000 points). Analyzes batches of messages per user, applies additional penalties for very negative messages, and provides comprehensive user statistics
+- **Audit Log**: Tracks and logs all important server events (message edits/deletions, role changes, channel updates, bans, timeouts, etc.) to a private moderator-only channel
+- **Word Filter**: Automatically detects and removes messages containing racist, homophobic, or otherwise inappropriate content, with a customizable blacklist and detailed statistics
 - **Database Storage**: Uses JSON files to store information about announced videos, counting statistics, and user behavior
 - **Automatic Updates**: Regularly updates YouTube video embeds with current view and like counts
 
@@ -72,6 +74,7 @@ AI Strejda Discord Bot is a versatile Discord bot designed to enhance your serve
    - Welcome Channel ID
    - YouTube API Key (if using YouTube notifications)
    - YouTube Channel ID
+   - Audit Log Channel ID (for server event logging)
 
    Note: You can use the `!setup` command to automatically create and configure the YouTube notification channel and counting channel.
 
@@ -173,6 +176,16 @@ python bot.py
 #### System Commands
 - `!shutdown` - Shutdown the bot (owner only)
 
+#### Audit Log Commands
+- `!setupaudit` - Create and configure the audit log channel (admin only)
+- `!setup_audit` - Alternative command to create the audit log channel (admin only)
+
+#### Word Filter Commands
+- `!blacklist_add [word]` - Add a word to the blacklist (admin only, only works in audit log channel)
+
+#### Server Rules Commands
+- `!pravidla [channel_id]` - Post server rules in the specified channel or current channel (admin only)
+
 ## How AI Moderation Works
 
 The AI Moderation system uses Google's Gemini AI to analyze user messages and automatically moderate your Discord server:
@@ -207,6 +220,8 @@ The AI Moderation system uses Google's Gemini AI to analyze user messages and au
   - `utility.py` - Utility commands functionality
   - `moderation.py` - Moderation commands functionality
   - `ai_moderation.py` - AI moderation functionality
+  - `audit_log.py` - Server event logging functionality
+  - `word_filter.py` - Word filtering and blacklist functionality
 - `utils/` - Utility modules:
   - `db.py` - Database functionality for storing video information
 - `db/` - Directory for JSON database files
@@ -253,6 +268,8 @@ AI Strejda Discord Bot je všestranný Discord bot navržený pro vylepšení va
 - **Dynamický status**: Zobrazuje aktuální počet členů ve statusu bota
 - **Hra na počítání**: Poskytuje zábavnou hru, kde uživatelé počítají od 1 do nekonečna s pravidly a statistikami
 - **AI Moderace**: Používá Google Gemini AI k analýze sentimentu zpráv, odměňování pozitivního chování více úrovněmi rolí (800/2000/5000 bodů) a penalizaci negativního chování timeouty a rolemi (-30/-1000 bodů). Analyzuje dávky zpráv od uživatelů, aplikuje dodatečné penalizace za velmi negativní zprávy a poskytuje komplexní statistiky uživatelů
+- **Audit Log**: Sleduje a zaznamenává všechny důležité události na serveru (úpravy/mazání zpráv, změny rolí, aktualizace kanálů, bany, timeouty atd.) do soukromého kanálu pouze pro moderátory
+- **Filtrování slov**: Automaticky detekuje a odstraňuje zprávy obsahující rasistický, homofobí nebo jinak nevhodný obsah, s přizpůsobitelným blacklistem a podrobnými statistikami
 - **Ukládání dat**: Používá JSON soubory pro ukládání informací o oznámených videích, statistikách počítání a chování uživatelů
 - **Automatické aktualizace**: Pravidelně aktualizuje YouTube embedy s aktuálními počty zhlédnutí a lajků
 
@@ -294,6 +311,7 @@ AI Strejda Discord Bot je všestranný Discord bot navržený pro vylepšení va
    - ID kanálu pro uvítací zprávy
    - YouTube API klíč (pokud používáte YouTube oznámení)
    - ID YouTube kanálu
+   - ID kanálu pro audit log (pro zaznamenávání událostí na serveru)
 
    Poznámka: Setup příkazy byly deaktivovány. Kanály je nyní potřeba vytvořit ručně a ID přidat do .env souboru.
 
@@ -395,6 +413,16 @@ python bot.py
 #### Systémové příkazy
 - `!shutdown` - Vypne bota (pouze vlastník)
 
+#### Audit Log příkazy
+- `!setupaudit` - Vytvoří a nakonfiguruje kanál pro audit log (pouze admin)
+- `!setup_audit` - Alternativní příkaz pro vytvoření kanálu pro audit log (pouze admin)
+
+#### Příkazy pro filtrování slov
+- `!blacklist_add [slovo]` - Přidá slovo do blacklistu (pouze admin, funguje pouze v audit log kanálu)
+
+#### Příkazy pro pravidla serveru
+- `!pravidla [id_kanálu]` - Odešle pravidla serveru do zadaného kanálu nebo aktuálního kanálu (pouze admin)
+
 ## Jak funguje AI moderace
 
 Systém AI moderace používá Google Gemini AI k analýze zpráv uživatelů a automatické moderaci vašeho Discord serveru:
@@ -429,6 +457,8 @@ Systém AI moderace používá Google Gemini AI k analýze zpráv uživatelů a 
   - `utility.py` - Funkcionalita užitečných příkazů
   - `moderation.py` - Funkcionalita moderačních příkazů
   - `ai_moderation.py` - Funkcionalita AI moderace
+  - `audit_log.py` - Funkcionalita zaznamenávání událostí na serveru
+  - `word_filter.py` - Funkcionalita filtrování slov a blacklistu
 - `utils/` - Užitečné moduly:
   - `db.py` - Databázová funkcionalita pro ukládání informací o videích
 - `db/` - Adresář pro JSON databázové soubory

@@ -93,6 +93,9 @@ class Moderation(commands.Cog):
             # Apply timeout
             await member.timeout(duration, reason=f"Timeout zadán administrátorem {ctx.author.display_name}")
 
+            # Vyvolání vlastního eventu pro audit log
+            self.bot.dispatch('member_timeout', member, datetime.datetime.now(datetime.timezone.utc) + duration)
+
             # Create embed for confirmation
             embed = discord.Embed(
                 title="⏱️ Timeout udělen",
@@ -139,6 +142,9 @@ class Moderation(commands.Cog):
         try:
             # Remove timeout by setting it to None
             await member.timeout(None, reason=f"Timeout zrušen administrátorem {ctx.author.display_name}")
+
+            # Vyvolání vlastního eventu pro audit log
+            self.bot.dispatch('member_timeout', member, None)
 
             # Create embed for confirmation
             embed = discord.Embed(

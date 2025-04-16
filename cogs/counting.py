@@ -174,8 +174,24 @@ class Counting(commands.Cog):
             await self.update_channel_topic()
 
     @commands.command(name="count")
+    @commands.has_permissions(administrator=True)
     async def count_status(self, ctx):
-        """Show the current counting status"""
+        """Show the current counting status (admin only)"""
+        # Kontrola, zda je příkaz použit v kanálu pro počítání
+        if ctx.channel.id != COUNTING_CHANNEL_ID:
+            try:
+                await ctx.message.delete()
+                await ctx.author.send(f"Příkaz !count lze použít pouze v kanálu pro počítání <#{COUNTING_CHANNEL_ID}>")
+            except Exception as e:
+                print(f"Chyba při mazání zprávy nebo posílání DM: {str(e)}")
+            return
+
+        # Smazání zprávy s příkazem
+        try:
+            await ctx.message.delete()
+        except Exception as e:
+            print(f"Chyba při mazání zprávy: {str(e)}")
+
         embed = discord.Embed(
             title="Počítání",
             description=f"Aktuální stav počítání v <#{COUNTING_CHANNEL_ID}>",
@@ -193,6 +209,21 @@ class Counting(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def reset_count(self, ctx):
         """Reset the counting (admin only)"""
+        # Kontrola, zda je příkaz použit v kanálu pro počítání
+        if ctx.channel.id != COUNTING_CHANNEL_ID:
+            try:
+                await ctx.message.delete()
+                await ctx.author.send(f"Příkaz !countreset lze použít pouze v kanálu pro počítání <#{COUNTING_CHANNEL_ID}>")
+            except Exception as e:
+                print(f"Chyba při mazání zprávy nebo posílání DM: {str(e)}")
+            return
+
+        # Smazání zprávy s příkazem
+        try:
+            await ctx.message.delete()
+        except Exception as e:
+            print(f"Chyba při mazání zprávy: {str(e)}")
+
         self.data["current_count"] = 0
         self.data["last_user_id"] = None
         self.save_data()
@@ -203,6 +234,12 @@ class Counting(commands.Cog):
     @commands.command(name="countrules")
     async def count_rules(self, ctx):
         """Show the counting rules"""
+        # Smazání zprávy s příkazem
+        try:
+            await ctx.message.delete()
+        except Exception as e:
+            print(f"Chyba při mazání zprávy: {str(e)}")
+
         embed = discord.Embed(
             title="Pravidla počítání",
             description="Jak funguje počítání v tomto serveru:",

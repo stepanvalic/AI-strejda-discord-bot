@@ -6,7 +6,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 load_dotenv()
-YOUTUBE_CHANNEL = os.getenv('YOUTUBE_CHANNEL_ID', '@davidstrejc')
+YOUTUBE_CHANNEL = os.getenv('YOUTUBE_CHANNEL_ID')
 try:
     YOUTUBE_NOTIFICATION_CHANNEL_ID = int(os.getenv('YOUTUBE_NOTIFICATION_CHANNEL_ID', 0))
 except ValueError:
@@ -28,6 +28,17 @@ class Utility(commands.Cog):
     @commands.command(name="yt", aliases=["youtube"])
     async def youtube_channel(self, ctx):
         """Zobrazí odkaz na YouTube kanál"""
+        # Kontrola, zda je YouTube kanál nastaven
+        if not YOUTUBE_CHANNEL:
+            await ctx.send("YouTube kanál není nastaven v .env souboru.", ephemeral=True)
+            return
+
+        # Smazání zprávy s příkazem
+        try:
+            await ctx.message.delete()
+        except Exception as e:
+            print(f"Chyba při mazání zprávy: {str(e)}")
+
         channel_url = f"https://www.youtube.com/{YOUTUBE_CHANNEL}" if YOUTUBE_CHANNEL.startswith('@') else f"https://www.youtube.com/channel/{YOUTUBE_CHANNEL}"
 
         embed = discord.Embed(
@@ -166,7 +177,7 @@ class Utility(commands.Cog):
                 ai_commands[cmd_name] = cmd_desc
             elif command.name in ["timeout", "untimeout", "unmute", "ban", "unban"]:
                 moderation_commands[cmd_name] = cmd_desc
-            elif command.name in ["uptime", "discord", "dc", "prikazy", "commands"]:
+            elif command.name in ["uptime", "discord", "dc", "prikazy", "commands", "help"]:
                 utility_commands[cmd_name] = cmd_desc
             else:
                 other_commands[cmd_name] = cmd_desc
@@ -190,7 +201,209 @@ class Utility(commands.Cog):
         add_commands_to_embed(other_commands, "Ostatní příkazy")
         add_commands_to_embed(admin_commands, "Admin příkazy")
 
+        # Smazání zprávy s příkazem
+        try:
+            await ctx.message.delete()
+        except Exception as e:
+            print(f"Chyba při mazání zprávy: {str(e)}")
+
         await ctx.send(embed=embed, ephemeral=True)
+
+    @commands.command(name="help")
+    async def help_command(self, ctx):
+        """Zobrazí nápovědu pro běžné uživatele"""
+        embed = discord.Embed(
+            title="Nápověda pro uživatele",
+            description="Zde je seznam příkazů pro běžné uživatele:",
+            color=discord.Color.blue()
+        )
+
+        # Kategorie příkazů
+        utility_commands = {}
+        counting_commands = {}
+        youtube_commands = {}
+        ai_commands = {}
+        other_commands = {}
+
+        for command in self.bot.commands:
+            if command.hidden:
+                continue
+
+            # Přeskočit admin příkazy
+            requires_admin = False
+            for check in command.checks:
+                if "administrator" in str(check) or "is_owner" in str(check):
+                    requires_admin = True
+                    break
+
+            if requires_admin:
+                continue
+
+            cmd_desc = command.help or "Žádný popis"
+            cmd_name = f"!{command.name}"
+
+            if command.aliases:
+                aliases = ", !".join(command.aliases)
+                cmd_name += f" (nebo !{aliases})"
+
+            # Rozdělení příkazů do kategorií (pouze uživatelské příkazy)
+            if command.name in ["yt", "youtube", "kanal"]:
+                youtube_commands[cmd_name] = cmd_desc
+            elif command.name in ["countrules", "countstats"]:
+                counting_commands[cmd_name] = cmd_desc
+            elif command.name in ["aiscore", "aitop", "aibottom"]:
+                ai_commands[cmd_name] = cmd_desc
+            elif command.name in ["uptime", "discord", "dc", "help"]:
+                utility_commands[cmd_name] = cmd_desc
+            else:
+                # Přeskočit moderační příkazy
+                if command.name not in ["timeout", "untimeout", "unmute", "ban", "unban", "prikazy", "commands"]:
+                    other_commands[cmd_name] = cmd_desc
+
+        # Funkce pro přidání kategorie příkazů do embedu
+        def add_commands_to_embed(commands_dict, category_name):
+            if not commands_dict:
+                return
+
+            commands_text = ""
+            for cmd, desc in commands_dict.items():
+                commands_text += f"**{cmd}** - {desc}\n"
+            embed.add_field(name=category_name, value=commands_text, inline=False)
+
+        # Přidání kategorií do embedu
+        add_commands_to_embed(utility_commands, "Užitečné příkazy")
+        add_commands_to_embed(youtube_commands, "YouTube příkazy")
+        add_commands_to_embed(counting_commands, "Počítací příkazy")
+        add_commands_to_embed(ai_commands, "AI Moderace příkazy")
+        add_commands_to_embed(other_commands, "Ostatní příkazy")
+
+        # Smazání zprávy s příkazem
+        try:
+            await ctx.message.delete()
+        except Exception as e:
+            print(f"Chyba při mazání zprávy: {str(e)}")
+
+        await ctx.send(embed=embed)
+
+    @commands.command(name="pravidla")
+    @commands.has_permissions(administrator=True)
+    async def server_rules(self, ctx, channel_id: str = None):
+        """Zobrazí pravidla serveru ve dvou embedech (admin only)"""
+        # Smazání zprávy s příkazem
+        try:
+            await ctx.message.delete()
+        except Exception as e:
+            print(f"Chyba při mazání zprávy: {str(e)}")
+
+        # Určení cílového kanálu
+        target_channel = None
+        if channel_id:
+            try:
+                channel_id = int(channel_id)
+                target_channel = self.bot.get_channel(channel_id)
+            except ValueError:
+                await ctx.send("Neplatné ID kanálu. Zadej platné číselné ID.", ephemeral=True)
+                return
+
+        if not target_channel:
+            target_channel = ctx.channel
+
+        # Vytvoření embedu s obecnými pravidly
+        general_rules_embed = discord.Embed(
+            title="📜 Pravidla serveru",
+            description="Prosím, dodržujte tato pravidla pro udržení přátelské a bezpečné komunity.",
+            color=discord.Color.blue()
+        )
+
+        general_rules_embed.add_field(
+            name="1. Buďte k sobě slušní",
+            value="Chovejte se k ostatním s respektem. Není tolerováno obtěžování, ublížení nebo jiné nevhodné chování.",
+            inline=False
+        )
+
+        general_rules_embed.add_field(
+            name="2. Žádné nevhodné nebo urážlivé obsah",
+            value="Nezveřejňujte obsah, který je sexuální, násilný, rasistický nebo jinak nevhodný.",
+            inline=False
+        )
+
+        general_rules_embed.add_field(
+            name="3. Žádný spam nebo sebepropagace",
+            value="Nezahlcujte kanály opakovanými zprávami nebo nevhodnými odkazy. Sebepropagace je povolena pouze v určených kanálech.",
+            inline=False
+        )
+
+        general_rules_embed.add_field(
+            name="4. Používejte správné kanály",
+            value="Posílejte zprávy do odpovídajících kanálů podle jejich tématu.",
+            inline=False
+        )
+
+        general_rules_embed.add_field(
+            name="5. Respektujte moderátory",
+            value="Moderátoři jsou zde, aby udržovali pořádek. Respektujte jejich rozhodnutí a pokyny.",
+            inline=False
+        )
+
+        general_rules_embed.set_footer(text="Porušení pravidel může vést k varovaní, dočasnému nebo trvalému zabanování.")
+
+        # Vytvoření embedu s pravidly AI hlídače
+        ai_rules_embed = discord.Embed(
+            title="🤖 AI Hlídač - Pravidla a bodování",
+            description="Náš server používá AI systém pro hodnocení chování uživatelů. Zde je vysvětlení, jak funguje:",
+            color=discord.Color.purple()
+        )
+
+        ai_rules_embed.add_field(
+            name="💬 Analýza zpráv",
+            value="AI analyzuje vaše zprávy a hodnotit jejich sentiment (pozitivní nebo negativní). Za pozitivní komunikaci získáváte body, za negativní je ztrácíte.",
+            inline=False
+        )
+
+        ai_rules_embed.add_field(
+            name="🌟 Odměny za pozitivní chování",
+            value="**Úroveň 1:** 800+ bodů - získáte speciální roli\n"
+                  "**Úroveň 2:** 2000+ bodů - získáte pokročilejší roli\n"
+                  "**Úroveň 3:** 5000+ bodů - získáte nejvyšší roli",
+            inline=False
+        )
+
+        ai_rules_embed.add_field(
+            name="⚠️ Postihy za negativní chování",
+            value="**Timeout:** -30 bodů - dočasný timeout\n"
+                  "**Negativní role:** -1000 bodů - přidělení negativní role\n"
+                  "**Extra postih:** -50 bodů za každou velmi negativní zprávu",
+            inline=False
+        )
+
+        ai_rules_embed.add_field(
+            name="📊 Kontrola vašeho skóre",
+            value="Použijte příkaz `!aiscore` pro zobrazení vašeho aktuálního skóre.\n"
+                  "`!aitop` zobrazí žebříček nejlepších uživatelů.\n"
+                  "`!aibottom` zobrazí uživatele s nejnižším skóre.",
+            inline=False
+        )
+
+        ai_rules_embed.add_field(
+            name="🔍 Sledované chování",
+            value="AI sleduje zejména:\n"
+                  "- Urážlivý jazyk a nadávky\n"
+                  "- Rasistické a diskriminační výrazy\n"
+                  "- Obtěžování a vyhrožování\n"
+                  "- Pozitivní a nápomocné příspěvky\n"
+                  "- Přátelské a konstruktivní diskuze",
+            inline=False
+        )
+
+        ai_rules_embed.set_footer(text="AI moderátor je zde, aby pomohl udržet přátelskou atmosféru, ne aby vás trestal. Buďte k sobě milí!")
+
+        # Odeslání embedů
+        await target_channel.send(embed=general_rules_embed)
+        await target_channel.send(embed=ai_rules_embed)
+
+        # Potvrzení pro admina
+        if target_channel != ctx.channel:
+            await ctx.send(f"Pravidla byla odeslána do kanálu {target_channel.mention}.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Utility(bot))

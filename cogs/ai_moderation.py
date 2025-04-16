@@ -12,8 +12,20 @@ load_dotenv()
 # Load configuration from .env
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 AI_MODEL = os.getenv('AI_MODEL', 'gemini-2.0-flash')
-# Message batch size
-AI_MESSAGES_BATCH = int(os.getenv('AI_MESSAGES_BATCH', 51))
+# Message batch size - must be set in .env
+# Force reload the .env file to get the latest values
+load_dotenv(override=True)
+AI_MESSAGES_BATCH_STR = os.getenv('AI_MESSAGES_BATCH')
+if not AI_MESSAGES_BATCH_STR:
+    print("[AI Mod] ERROR: AI_MESSAGES_BATCH not set in .env file. AI moderation will not function properly.")
+    AI_MESSAGES_BATCH = 0  # Will prevent processing
+else:
+    try:
+        AI_MESSAGES_BATCH = int(AI_MESSAGES_BATCH_STR)
+        print(f"[AI Mod] Using batch size of {AI_MESSAGES_BATCH} messages")
+    except ValueError:
+        print(f"[AI Mod] ERROR: Invalid AI_MESSAGES_BATCH value: {AI_MESSAGES_BATCH_STR}. AI moderation will not function properly.")
+        AI_MESSAGES_BATCH = 0  # Will prevent processing
 AI_MODERATION_SAVE_FILE = os.getenv('AI_MODERATION_SAVE_FILE', 'db/ai_moderation.json')
 AI_MODERATION_INTERVAL_MINUTES = int(os.getenv('AI_MODERATION_INTERVAL_MINUTES', 5))
 
@@ -65,6 +77,18 @@ except ValueError:
 
 class AIModeration(commands.Cog):
     def __init__(self, bot):
+        # Force reload the .env file to get the latest values
+        load_dotenv(override=True)
+        # Get the batch size again to ensure we have the latest value
+        ai_messages_batch_str = os.getenv('AI_MESSAGES_BATCH')
+        if ai_messages_batch_str:
+            try:
+                global AI_MESSAGES_BATCH
+                AI_MESSAGES_BATCH = int(ai_messages_batch_str)
+                print(f"[AI Mod] Initialized with batch size of {AI_MESSAGES_BATCH} messages")
+            except ValueError:
+                pass
+
         self.bot = bot
         self.pending_messages = {}  # {user_id: [messages]}
         self.data = self.load_data()
@@ -157,6 +181,10 @@ class AIModeration(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
+        # Ignore příkazy (zprávy začínající !) a odkazy
+        if message.content.startswith('!') or 'http://' in message.content or 'https://' in message.content:
+            return
+
         # Add message to pending queue
         user_id = message.author.id
         if user_id not in self.pending_messages:
@@ -171,7 +199,7 @@ class AIModeration(commands.Cog):
             "message_id": message.id
         })
 
-        print(f"[AI Mod] Message recorded for {message.author.display_name}: {len(self.pending_messages[user_id])}/10 messages")
+        print(f"[AI Mod] Message recorded for {message.author.display_name}: {len(self.pending_messages[user_id])}/{AI_MESSAGES_BATCH} messages")
 
         # Keep only the latest AI_MESSAGES_BATCH messages
         if len(self.pending_messages[user_id]) > AI_MESSAGES_BATCH:
@@ -180,7 +208,7 @@ class AIModeration(commands.Cog):
 
         # Process messages immediately when we reach the batch size
         if len(self.pending_messages[user_id]) >= AI_MESSAGES_BATCH:
-            print(f"[AI Mod] Reached 10 messages for {message.author.display_name}, processing now...")
+            print(f"[AI Mod] Reached {AI_MESSAGES_BATCH} messages for {message.author.display_name}, processing now...")
             # Ensure we only process the exact batch size
             self.pending_messages[user_id] = self.pending_messages[user_id][-AI_MESSAGES_BATCH:]
             await self.process_user_messages(user_id)
@@ -701,10 +729,19 @@ Provide your analysis in the following JSON format:
 
         # Add user fields
         for i, (user_id, data) in enumerate(top_users, 1):
-            username = data["username"] or f"Uživatel {user_id}"
+            # Získání objektu uživatele z Discord serveru
+            guild = ctx.guild
+            member = guild.get_member(int(user_id))
+
+            if member:
+                # Použij mention, pokud je uživatel na serveru
+                user_display = member.mention
+            else:
+                # Použij uložené jméno nebo ID, pokud uživatel není na serveru
+                user_display = data["username"] or f"Uživatel {user_id}"
 
             embed.add_field(
-                name=f"{i}. {username}",
+                name=f"{i}. {user_display}",
                 value=f"Skóre: **{data['total_score']}**\n"
                       f"Pozitivní: **{data['positive_score']}**\n"
                       f"Negativní: **{data['negative_score']}**",
@@ -747,10 +784,19 @@ Provide your analysis in the following JSON format:
 
         # Add user fields
         for i, (user_id, data) in enumerate(bottom_users, 1):
-            username = data["username"] or f"Uživatel {user_id}"
+            # Získání objektu uživatele z Discord serveru
+            guild = ctx.guild
+            member = guild.get_member(int(user_id))
+
+            if member:
+                # Použij mention, pokud je uživatel na serveru
+                user_display = member.mention
+            else:
+                # Použij uložené jméno nebo ID, pokud uživatel není na serveru
+                user_display = data["username"] or f"Uživatel {user_id}"
 
             embed.add_field(
-                name=f"{i}. {username}",
+                name=f"{i}. {user_display}",
                 value=f"Skóre: **{data['total_score']}**\n"
                       f"Pozitivní: **{data['positive_score']}**\n"
                       f"Negativní: **{data['negative_score']}**",
