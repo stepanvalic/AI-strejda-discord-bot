@@ -157,20 +157,15 @@ class YouTubePing(commands.Cog):
             print("YouTube API key is missing")
             return
 
-        print(f"Checking for new videos on channel {YOUTUBE_CHANNEL}...")
-
+        # Kontrola nových videí (debug vypnut)
         video = await self.get_latest_video()
 
         if not video:
-            print("No videos found or error occurred")
             return
-
-        print(f"Latest video found: {video['title']} (ID: {video['id']})")
 
         db.save_video(video)
 
         if db.is_video_announced(video['id']):
-            print(f"Video {video['id']} was already announced")
             return
 
         if self.last_video_id is None:
@@ -178,24 +173,18 @@ class YouTubePing(commands.Cog):
 
             if announced_videos:
                 self.last_video_id = announced_videos[0]['video_id']
-                print(f"First run, setting last video ID to {self.last_video_id} from database")
             else:
                 self.last_video_id = video['id']
-                print(f"First run, setting last video ID to {video['id']}")
             return
 
         if video['id'] != self.last_video_id:
-            print(f"New video detected! Old ID: {self.last_video_id}, New ID: {video['id']}")
             self.last_video_id = video['id']
             await self.send_notification(video)
-        else:
-            print(f"No new videos (last video ID: {self.last_video_id})")
 
     async def send_notification(self, video):
         channel = self.bot.get_channel(YOUTUBE_NOTIFICATION_CHANNEL_ID)
 
         if not channel:
-            print(f"YouTube notification channel with ID {YOUTUBE_NOTIFICATION_CHANNEL_ID} not found!")
             return
 
         embed = await self.create_video_embed(video)
@@ -214,7 +203,6 @@ class YouTubePing(commands.Cog):
         )
 
         db.update_message_ids(video['id'], str(message.id), str(channel.id))
-        print(f"Notification sent for video {video['id']} with message ID {message.id}")
 
     @check_uploads.before_loop
     async def before_check_uploads(self):
@@ -222,12 +210,10 @@ class YouTubePing(commands.Cog):
 
     @tasks.loop(seconds=UPDATE_INTERVAL_SECONDS)
     async def update_embeds(self):
-        print("Updating previous video embeds...")
 
         announced_videos = db.get_announced_videos()
 
         if not announced_videos:
-            print("No announced videos found in database")
             return
 
         videos_to_update = announced_videos[:5]
@@ -240,7 +226,6 @@ class YouTubePing(commands.Cog):
                 updated_video = await self.get_video_details(video_data['video_id'])
 
                 if not updated_video:
-                    print(f"Could not get updated information for video {video_data['video_id']}")
                     continue
 
                 channel_id = int(video_data['channel_message_id'])
@@ -248,13 +233,11 @@ class YouTubePing(commands.Cog):
 
                 channel = self.bot.get_channel(channel_id)
                 if not channel:
-                    print(f"Could not find channel with ID {channel_id}")
                     continue
 
                 try:
                     message = await channel.fetch_message(message_id)
                 except discord.NotFound:
-                    print(f"Could not find message with ID {message_id} in channel {channel_id}")
                     continue
 
                 embed = await self.create_video_embed(updated_video)
@@ -262,8 +245,6 @@ class YouTubePing(commands.Cog):
                 await message.edit(embed=embed)
 
                 db.save_video(updated_video, str(message_id), str(channel_id))
-
-                print(f"Updated embed for video {updated_video['id']} (views: {updated_video['views']}, likes: {updated_video['likes']})")
 
             except Exception as e:
                 print(f"Error updating embed for video {video_data['video_id']}: {str(e)}")
@@ -365,6 +346,34 @@ class YouTubePing(commands.Cog):
         await self.update_embeds()
 
         await ctx.send("Aktualizace dokončena!")
+
+    @commands.command(name="ytlastvideosend")
+    @commands.has_permissions(administrator=True)
+    async def send_last_video(self, ctx):
+        """Pošle poslední video do nastaveného kanálu (admin only)"""
+        if not YOUTUBE_NOTIFICATION_CHANNEL_ID:
+            await ctx.send("Není nastaven kanál pro oznámení YouTube videí v .env souboru.", ephemeral=True)
+            return
+
+        await ctx.send("Zjišťuji poslední video a posílám ho do nastaveného kanálu...", ephemeral=True)
+
+        # Get the latest video
+        video = await self.get_latest_video()
+
+        if not video:
+            await ctx.send("Nepodařilo se získat informace o nejnovějším videu.", ephemeral=True)
+            return
+
+        # Save the video to the database
+        db.save_video(video)
+
+        # Send the notification
+        await self.send_notification(video)
+
+        # Update the last video ID
+        self.last_video_id = video['id']
+
+        await ctx.send(f"Poslední video '{video['title']}' bylo odesláno do kanálu.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(YouTubePing(bot))

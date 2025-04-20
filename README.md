@@ -30,11 +30,12 @@ AI Strejda Discord Bot is a versatile Discord bot designed to enhance your serve
 - **YouTube Notifications**: Monitors your YouTube channel and sends notifications with rich embeds when new videos are uploaded
 - **Dynamic Status**: Displays the current member count in the bot's status
 - **Counting Game**: Provides a fun counting game where users count up from 1 to infinity with rules and statistics
-- **AI Moderation**: Uses Google Gemini AI to analyze message sentiment, reward positive behavior with multiple role levels (800/2000/5000 points), and penalize negative behavior with timeouts and roles (-30/-1000 points). Analyzes batches of messages per user, applies additional penalties for very negative messages, and provides comprehensive user statistics
+- **AI Moderation**: Uses Google Gemini AI to analyze message sentiment, reward positive behavior with multiple role levels (800/2000/5000 points), and penalize negative behavior with roles (-30/-1000 points). Analyzes batches of messages per user, applies additional penalties for very negative messages, and provides comprehensive user statistics. Automatic timeouts and timeout reminders are disabled.
 - **Audit Log**: Tracks and logs all important server events (message edits/deletions, role changes, channel updates, bans, timeouts, etc.) to a private moderator-only channel
 - **Word Filter**: Automatically detects and removes messages containing racist, homophobic, or otherwise inappropriate content, with a customizable blacklist and detailed statistics
 - **Database Storage**: Uses JSON files to store information about announced videos, counting statistics, and user behavior
 - **Automatic Updates**: Regularly updates YouTube video embeds with current view and like counts
+- **Chat Summarization**: Automatically generates daily summaries of chat conversations at 3 AM using OpenRouter with the deepseek model, organized by topics
 
 ## Requirements
 
@@ -42,6 +43,7 @@ AI Strejda Discord Bot is a versatile Discord bot designed to enhance your serve
 - Discord Bot Token
 - YouTube API Key (for YouTube notifications)
 - Google Gemini API Key (for AI moderation)
+- OpenRouter API Key (for chat summarization)
 - Discord server with appropriate permissions
 
 ## Installation
@@ -75,6 +77,8 @@ AI Strejda Discord Bot is a versatile Discord bot designed to enhance your serve
    - YouTube API Key (if using YouTube notifications)
    - YouTube Channel ID
    - Audit Log Channel ID (for server event logging)
+   - OpenRouter API Key (for chat summarization)
+   - Summary Channel ID (for chat summaries)
 
    Note: You can use the `!setup` command to automatically create and configure the YouTube notification channel and counting channel.
 
@@ -105,6 +109,20 @@ AI Strejda Discord Bot is a versatile Discord bot designed to enhance your serve
 3. Add the API key to your `.env` file as `GEMINI_API_KEY`
 4. Enable the Generative Language API in Google Cloud Console
 5. Configure the AI moderation settings in your `.env` file:
+
+### OpenRouter API Setup (for chat summarization)
+
+1. Create an account at [OpenRouter](https://openrouter.ai/)
+2. Generate an API key
+3. Add the API key to your `.env` file as `OPENROUTER_API_KEY`
+4. Configure the chat summarization settings in your `.env` file:
+   ```
+   # Chat Summarization Configuration
+   OPENROUTER_API_KEY=your_openrouter_api_key_here
+   OPENROUTER_MODEL=deepseek/deepseek-chat-v3-0324:free
+   SUMMARY_CHAT_ID=your_chat_id_to_monitor_here
+   SUMMARY_CHANNEL_ID=your_summary_channel_id_here
+   ```
    ```
    # AI Moderation Configuration
    GEMINI_API_KEY=your_gemini_api_key_here
@@ -151,6 +169,7 @@ python bot.py
 - `!kanal` - Shows the channel with the best flow
 - `!checkyoutube` - Manually check for the latest YouTube video (admin only)
 - `!updatevideos` - Manually update all video embeds (admin only)
+- `!ytlastvideosend` - Manually send the latest YouTube video to the configured channel (admin only)
 
 #### Counting Game Commands
 - `!count` - Show the current counting status and next number
@@ -172,6 +191,9 @@ python bot.py
 - `!ban [@user] [reason]` - Permanently ban a user with optional reason (admin only)
 - `!unban [user_id]` - Unban a user by their ID (admin only)
 - `!welcome [@user]` - Manually send a welcome message for a user (admin only)
+
+#### Chat Summary Commands
+- `!sumarizace-stepan [#channel]` - Manually trigger a chat summary for the previous day and send it to the specified channel or the default channel (admin only)
 
 #### System Commands
 - `!shutdown` - Shutdown the bot (owner only)
@@ -195,12 +217,12 @@ The AI Moderation system uses Google's Gemini AI to analyze user messages and au
 3. Each analysis produces a positive and negative score
 4. Very negative messages receive an additional -50 point penalty
 5. These scores are added to the user's total score
-6. If a user's total score falls below -30, they receive a timeout
+6. If a user's total score falls below -30, the system logs this information (automatic timeouts are disabled)
 7. If a user's total score falls below -1000, they receive the negative role
 8. If a user's total score rises above the positive thresholds, they receive the corresponding positive roles
-9. Timeout duration increases with repeated offenses (starting at 5 minutes, up to 24 hours)
-10. Admins are analyzed but not penalized
-11. All data is stored in a JSON file for persistence
+9. Admins are analyzed but not penalized
+10. All data is stored in a JSON file for persistence
+11. Daily chat summaries are generated at 3 AM using OpenRouter with the deepseek model
 
 ### Troubleshooting AI Moderation
 
@@ -222,8 +244,10 @@ The AI Moderation system uses Google's Gemini AI to analyze user messages and au
   - `ai_moderation.py` - AI moderation functionality
   - `audit_log.py` - Server event logging functionality
   - `word_filter.py` - Word filtering and blacklist functionality
+  - `chat_summary.py` - Chat summarization functionality
 - `utils/` - Utility modules:
   - `db.py` - Database functionality for storing video information
+  - `chat_db.py` - Database functionality for storing chat messages and summaries
 - `db/` - Directory for JSON database files
 - `.env` - Configuration file for bot settings
 - `requirements.txt` - Python dependencies
@@ -267,11 +291,12 @@ AI Strejda Discord Bot je všestranný Discord bot navržený pro vylepšení va
 - **YouTube oznámení**: Sleduje váš YouTube kanál a odesílá oznámení s bohatými embedy, když jsou nahrána nová videa
 - **Dynamický status**: Zobrazuje aktuální počet členů ve statusu bota
 - **Hra na počítání**: Poskytuje zábavnou hru, kde uživatelé počítají od 1 do nekonečna s pravidly a statistikami
-- **AI Moderace**: Používá Google Gemini AI k analýze sentimentu zpráv, odměňování pozitivního chování více úrovněmi rolí (800/2000/5000 bodů) a penalizaci negativního chování timeouty a rolemi (-30/-1000 bodů). Analyzuje dávky zpráv od uživatelů, aplikuje dodatečné penalizace za velmi negativní zprávy a poskytuje komplexní statistiky uživatelů
+- **AI Moderace**: Používá Google Gemini AI k analýze sentimentu zpráv, odměňování pozitivního chování více úrovněmi rolí (800/2000/5000 bodů) a penalizaci negativního chování rolemi (-30/-1000 bodů). Analyzuje dávky zpráv od uživatelů, aplikuje dodatečné penalizace za velmi negativní zprávy a poskytuje komplexní statistiky uživatelů. Automatické timeouty a upozornění na timeouty jsou vypnuty.
 - **Audit Log**: Sleduje a zaznamenává všechny důležité události na serveru (úpravy/mazání zpráv, změny rolí, aktualizace kanálů, bany, timeouty atd.) do soukromého kanálu pouze pro moderátory
 - **Filtrování slov**: Automaticky detekuje a odstraňuje zprávy obsahující rasistický, homofobí nebo jinak nevhodný obsah, s přizpůsobitelným blacklistem a podrobnými statistikami
 - **Ukládání dat**: Používá JSON soubory pro ukládání informací o oznámených videích, statistikách počítání a chování uživatelů
 - **Automatické aktualizace**: Pravidelně aktualizuje YouTube embedy s aktuálními počty zhlédnutí a lajků
+- **Shrnutí chatu**: Automaticky generuje denní shrnutí konverzací v chatu ve 3 hodiny ráno pomocí OpenRouteru s modelem deepseek, organizované podle témat
 
 ## Požadavky
 
@@ -279,6 +304,7 @@ AI Strejda Discord Bot je všestranný Discord bot navržený pro vylepšení va
 - Discord Bot Token
 - YouTube API klíč (pro YouTube oznámení)
 - Google Gemini API klíč (pro AI moderaci)
+- OpenRouter API klíč (pro shrnutí chatu)
 - Discord server s příslušnými oprávněními
 
 ## Instalace
@@ -312,6 +338,8 @@ AI Strejda Discord Bot je všestranný Discord bot navržený pro vylepšení va
    - YouTube API klíč (pokud používáte YouTube oznámení)
    - ID YouTube kanálu
    - ID kanálu pro audit log (pro zaznamenávání událostí na serveru)
+   - OpenRouter API klíč (pro shrnutí chatu)
+   - ID kanálu pro shrnutí (pro shrnutí chatu)
 
    Poznámka: Setup příkazy byly deaktivovány. Kanály je nyní potřeba vytvořit ručně a ID přidat do .env souboru.
 
@@ -342,6 +370,20 @@ AI Strejda Discord Bot je všestranný Discord bot navržený pro vylepšení va
 3. Přidejte API klíč do vašeho souboru `.env` jako `GEMINI_API_KEY`
 4. Povolte Generative Language API v Google Cloud Console
 5. Nakonfigurujte nastavení AI moderace ve vašem souboru `.env`:
+
+### Nastavení OpenRouter API (pro shrnutí chatu)
+
+1. Vytvořte účet na [OpenRouter](https://openrouter.ai/)
+2. Vygenerujte API klíč
+3. Přidejte API klíč do vašeho souboru `.env` jako `OPENROUTER_API_KEY`
+4. Nakonfigurujte nastavení shrnutí chatu ve vašem souboru `.env`:
+   ```
+   # Konfigurace shrnutí chatu
+   OPENROUTER_API_KEY=vas_openrouter_api_klic_zde
+   OPENROUTER_MODEL=deepseek/deepseek-chat-v3-0324:free
+   SUMMARY_CHAT_ID=id_chatu_ke_sledovani_zde
+   SUMMARY_CHANNEL_ID=id_kanalu_pro_shrnuti_zde
+   ```
    ```
    # Konfigurace AI Moderace
    GEMINI_API_KEY=vas_gemini_api_klic_zde
@@ -388,6 +430,7 @@ python bot.py
 - `!kanal` - Zobrazí kanál s nejlepší flow
 - `!checkyoutube` - Ručně zkontroluje nejnovější YouTube video (pouze admin)
 - `!updatevideos` - Ručně aktualizuje všechny video embedy (pouze admin)
+- `!ytlastvideosend` - Ručně odešle nejnovější YouTube video do nastaveného kanálu (pouze admin)
 
 #### Počítací příkazy
 - `!count` - Zobrazí aktuální stav počítání a další číslo
@@ -409,6 +452,9 @@ python bot.py
 - `!ban [@uživatel] [důvod]` - Trvale zabanuje uživatele s volitelným důvodem (pouze admin)
 - `!unban [user_id]` - Odbanuje uživatele podle jeho ID (pouze admin)
 - `!welcome [@uživatel]` - Ručně odešle uvítací zprávu pro uživatele (pouze admin)
+
+#### Příkazy pro shrnutí chatu
+- `!sumarizace-stepan [#kanál]` - Ručně spustí shrnutí chatu za předchozí den a odešle ho do zadaného kanálu nebo výchozího kanálu (pouze admin)
 
 #### Systémové příkazy
 - `!shutdown` - Vypne bota (pouze vlastník)
@@ -432,12 +478,12 @@ Systém AI moderace používá Google Gemini AI k analýze zpráv uživatelů a 
 3. Každá analýza vytvoří pozitivní a negativní skóre
 4. Velmi negativní zprávy dostanou dodatečnou penalizaci -50 bodů
 5. Tato skóre se přičítají k celkovému skóre uživatele
-6. Pokud celkové skóre uživatele klesne pod -30, dostane timeout
+6. Pokud celkové skóre uživatele klesne pod -30, systém tuto informaci zaznamená (automatické timeouty jsou vypnuty)
 7. Pokud celkové skóre uživatele klesne pod -1000, dostane negativní roli
 8. Pokud celkové skóre uživatele stoupne nad pozitivní hranice, dostane odpovídající pozitivní role
-9. Délka timeoutu se zvyšuje s opakovanými přestupky (začíná na 5 minutách, až do 24 hodin)
-10. Admini jsou analyzováni, ale nejsou penalizováni
-11. Všechna data jsou uložena v JSON souboru pro persistenci
+9. Admini jsou analyzováni, ale nejsou penalizováni
+10. Všechna data jsou uložena v JSON souboru pro persistenci
+11. Denní shrnutí chatu jsou generována ve 3 hodiny ráno pomocí OpenRouteru s modelem deepseek
 
 ### Řešení problémů s AI moderací
 
@@ -459,8 +505,10 @@ Systém AI moderace používá Google Gemini AI k analýze zpráv uživatelů a 
   - `ai_moderation.py` - Funkcionalita AI moderace
   - `audit_log.py` - Funkcionalita zaznamenávání událostí na serveru
   - `word_filter.py` - Funkcionalita filtrování slov a blacklistu
+  - `chat_summary.py` - Funkcionalita shrnutí chatu
 - `utils/` - Užitečné moduly:
   - `db.py` - Databázová funkcionalita pro ukládání informací o videích
+  - `chat_db.py` - Databázová funkcionalita pro ukládání zpráv z chatu a shrnutí
 - `db/` - Adresář pro JSON databázové soubory
 - `.env` - Konfigurační soubor pro nastavení bota
 - `requirements.txt` - Python závislosti

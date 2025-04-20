@@ -160,7 +160,7 @@ class AIModeration(commands.Cog):
         user_data["username"] = username
 
         # Apply penalty for very negative messages
-        if negative_delta > 80:  # If message is very negative
+        if negative_delta > 90:  # If message is very negative (increased threshold from 80 to 90)
             print(f"[AI Mod] Applying extra penalty of {AI_NEGATIVE_PENALTY} for very negative message")
             negative_delta += abs(AI_NEGATIVE_PENALTY)  # Add extra penalty
 
@@ -230,7 +230,9 @@ class AIModeration(commands.Cog):
         # Prepare prompt for sentiment analysis
         prompt = f"""Analyze the sentiment of the following messages from a Discord user.
 Rate the overall sentiment on a scale from -100 (extremely negative/toxic) to +100 (extremely positive/friendly).
-Negative sentiment has more weight than positive sentiment.
+Be lenient in your analysis and give users the benefit of the doubt.
+Positive sentiment should be weighted more than negative sentiment.
+Only rate messages as very negative if they are clearly toxic, harmful, or offensive.
 
 Messages:
 {combined_text}
@@ -259,7 +261,7 @@ Provide your analysis in the following JSON format:
             response = await asyncio.to_thread(
                 model.generate_content,
                 [
-                    "You are an AI assistant that analyzes the sentiment of Discord messages. You detect toxic, negative, neutral, and positive content.",
+                    "You are an AI assistant that analyzes the sentiment of Discord messages. You detect toxic, negative, neutral, and positive content. Be extremely lenient and charitable in your analysis. Give users the benefit of the doubt and focus much more on positive aspects of messages than negative ones. Only flag content as very negative if it's clearly harmful, offensive, or toxic. Avoid penalizing users for casual banter, jokes, or mild criticism. Assume good intentions whenever possible. Your goal is to create a positive community atmosphere while only flagging truly problematic content.",
                     prompt
                 ],
                 generation_config=generation_config
@@ -365,60 +367,10 @@ Provide your analysis in the following JSON format:
 
     async def check_user_actions(self, member, user_data):
         """Check if any actions need to be taken based on user scores"""
-        # Check for timeout (negative threshold)
+        # Negative threshold check is disabled - no notifications or timeouts
+        # Just log the information for debugging purposes
         if user_data["total_score"] <= AI_NEGATIVE_THRESHOLD:
-            # Calculate timeout duration based on previous timeouts
-            timeout_count = user_data["timeout_count"]
-            base_duration = 5  # Base duration in minutes
-            duration = min(base_duration * (2 ** timeout_count), 60 * 24)  # Max 1 day
-
-            print(f"[AI Mod] User {member.display_name} has negative score ({user_data['total_score']}), applying timeout for {duration} minutes")
-
-            # Apply timeout
-            try:
-                # Convert minutes to seconds
-                timeout_seconds = duration * 60
-                await member.timeout(
-                    datetime.timedelta(seconds=timeout_seconds),
-                    reason=f"AI Moderation: Negative sentiment score ({user_data['total_score']})"
-                )
-
-                # Update user data
-                user_data["timeout_count"] += 1
-                user_data["last_timeout"] = datetime.datetime.now().isoformat()
-                self.save_data()
-                print(f"[AI Mod] Timeout applied to {member.display_name} for {duration} minutes")
-
-                # Send DM to user
-                try:
-                    embed = discord.Embed(
-                        title="⚠️ Automatický timeout",
-                        description=f"Byl ti udělen timeout na **{duration} minut** kvůli negativnímu chování.",
-                        color=discord.Color.red()
-                    )
-                    embed.add_field(
-                        name="Skóre",
-                        value=f"Tvoje skóre: **{user_data['total_score']}**\n"
-                              f"Hranice pro timeout: **{AI_NEGATIVE_THRESHOLD}**"
-                    )
-                    embed.add_field(
-                        name="Co to znamená?",
-                        value="Náš AI systém detekoval negativní chování ve tvých zprávách. "
-                              "Prosím, snaž se komunikovat pozitivněji a respektovat ostatní členy serveru."
-                    )
-                    embed.set_footer(text="Toto je automatická zpráva od AI moderačního systému.")
-
-                    await member.send(embed=embed)
-                    print(f"[AI Mod] DM sent to {member.display_name} about timeout")
-                except discord.Forbidden:
-                    # User has DMs disabled
-                    print(f"[AI Mod] Could not send DM to {member.display_name} (DMs disabled)")
-                    pass
-
-            except discord.Forbidden:
-                print(f"[AI Mod] Bot doesn't have permission to timeout {member.display_name}")
-            except Exception as e:
-                print(f"[AI Mod] Error applying timeout to {member.display_name}: {e}")
+            print(f"[AI Mod] User {member.display_name} has negative score ({user_data['total_score']}), but notifications are disabled")
 
         # Check for very negative role (-1000 points)
         if AI_NEGATIVE_ROLE_ID and user_data["total_score"] <= AI_VERY_NEGATIVE_THRESHOLD:
@@ -682,7 +634,7 @@ Provide your analysis in the following JSON format:
         # Add negative thresholds
         embed.add_field(
             name="Negativní hranice",
-            value=f"⚠️ Timeout: **{AI_NEGATIVE_THRESHOLD}**\n"
+            value=f"⚠️ Upozornění moderátorům: **{AI_NEGATIVE_THRESHOLD}**\n"
                   f"⛔ Negativní role: **{AI_VERY_NEGATIVE_THRESHOLD}**",
             inline=False
         )
@@ -734,11 +686,11 @@ Provide your analysis in the following JSON format:
             member = guild.get_member(int(user_id))
 
             if member:
-                # Použij mention, pokud je uživatel na serveru
-                user_display = member.mention
+                # Použij jméno uživatele, pokud je uživatel na serveru
+                user_display = member.display_name
             else:
-                # Použij uložené jméno nebo ID, pokud uživatel není na serveru
-                user_display = data["username"] or f"Uživatel {user_id}"
+                # Použij uložené jméno nebo "Neznámý uživatel", pokud uživatel není na serveru
+                user_display = data["username"] or "Neznámý uživatel"
 
             embed.add_field(
                 name=f"{i}. {user_display}",
@@ -789,11 +741,11 @@ Provide your analysis in the following JSON format:
             member = guild.get_member(int(user_id))
 
             if member:
-                # Použij mention, pokud je uživatel na serveru
-                user_display = member.mention
+                # Použij jméno uživatele, pokud je uživatel na serveru
+                user_display = member.display_name
             else:
-                # Použij uložené jméno nebo ID, pokud uživatel není na serveru
-                user_display = data["username"] or f"Uživatel {user_id}"
+                # Použij uložené jméno nebo "Neznámý uživatel", pokud uživatel není na serveru
+                user_display = data["username"] or "Neznámý uživatel"
 
             embed.add_field(
                 name=f"{i}. {user_display}",
@@ -838,7 +790,8 @@ Provide your analysis in the following JSON format:
             name="Bodovací systém",
             value=f"Každá zpráva dostane pozitivní a negativní skóre.\n"
                   f"Velmi negativní zprávy dostanou extra penalizaci **{AI_NEGATIVE_PENALTY}** bodů.\n"
-                  f"Celkové skóre = Pozitivní body - Negativní body.",
+                  f"Celkové skóre = Pozitivní body - Negativní body.\n"
+                  f"Systém je nastaven tak, aby byl shovívavý a dával přednost pozitivnímu hodnocení.",
             inline=False
         )
 
@@ -854,16 +807,17 @@ Provide your analysis in the following JSON format:
         # Negative thresholds
         embed.add_field(
             name="Negativní hranice",
-            value=f"⚠️ Timeout (**{AI_NEGATIVE_THRESHOLD}** bodů): Dočasný timeout\n"
+            value=f"⚠️ Upozornění moderátorům (**{AI_NEGATIVE_THRESHOLD}** bodů): Systém upozorní moderátory\n"
                   f"⛔ Negativní role (**{AI_VERY_NEGATIVE_THRESHOLD}** bodů): Přidělení negativní role",
             inline=False
         )
 
         # Timeout system
         embed.add_field(
-            name="Systém timeoutů",
-            value=f"Základní délka timeoutu: **5 minut**\n"
-                  f"Každý další timeout se zdvojnásobí (max. 24 hodin).",
+            name="Systém upozornění",
+            value=f"**AUTOMATICKÉ TIMEOUTY A UPOZORNĚNÍ JSOU VYPNUTY**\n\n"
+                  f"Systém pouze počítá skóre, ale neposílá upozornění při dosažení negativního skóre (**{AI_NEGATIVE_THRESHOLD}** bodů).\n"
+                  f"Moderátoři mohou použít příkaz `!timeout @uživatel [čas]` pro ruční udělení timeoutu.",
             inline=False
         )
 
@@ -912,7 +866,7 @@ Provide your analysis in the following JSON format:
 
         # Add user fields
         for i, (user_id, data) in enumerate(bottom_users, 1):
-            username = data["username"] or f"Uživatel {user_id}"
+            username = data["username"] or "Neznámý uživatel"
 
             embed.add_field(
                 name=f"{i}. {username}",

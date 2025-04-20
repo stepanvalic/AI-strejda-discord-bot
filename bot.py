@@ -47,8 +47,9 @@ async def on_command_error(ctx, error):
     await ctx.send(f"An error occurred: {error}")
 
 @bot.command(name="shutdown", hidden=True)
-@commands.is_owner()
+@commands.has_permissions(administrator=True)
 async def shutdown(ctx):
+    """Vypne bota (admin only)"""
     await ctx.send("Shutting down the bot...")
     await bot.close()
 
@@ -82,6 +83,12 @@ async def load_extensions():
 
     await bot.load_extension("cogs.word_filter")
     print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}word_filter{Fore.MAGENTA} cog")
+
+    await bot.load_extension("cogs.chat_summary")
+    print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}chat_summary{Fore.MAGENTA} cog")
+
+    await bot.load_extension("cogs.logger")
+    print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}logger{Fore.MAGENTA} cog")
 
     # Modul update_checker je deaktivován a bude zprovozněn později
     # await bot.load_extension("cogs.update_checker")

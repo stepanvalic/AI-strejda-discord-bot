@@ -26,6 +26,12 @@ except ValueError:
     WELCOME_CHANNEL_ID = 0
     print("Warning: Invalid WELCOME_CHANNEL_ID in .env file")
 
+try:
+    SUMMARY_CHANNEL_ID = int(os.getenv('SUMMARY_CHANNEL_ID', 0))
+except ValueError:
+    SUMMARY_CHANNEL_ID = 0
+    print("Warning: Invalid SUMMARY_CHANNEL_ID in .env file")
+
 def set_env_value(file_path, key, value):
     with open(file_path, 'r') as file:
         lines = file.readlines()
@@ -147,6 +153,43 @@ class Setup(commands.Cog):
         except Exception as e:
             await ctx.send(f"Chyba při vytváření kanálu pro aktualizace: {str(e)}", ephemeral=True)
 
+    @commands.command(name="setup_summary")
+    @commands.has_permissions(administrator=True)
+    async def setup_summary(self, ctx):
+        guild = ctx.guild
+
+        channel_name = "【📊】𝙨𝙝𝙧𝙣𝙪𝙩𝙞"
+
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(send_messages=False),
+            guild.me: discord.PermissionOverwrite(send_messages=True)
+        }
+
+        try:
+            channel = await guild.create_text_channel(
+                name=channel_name,
+                overwrites=overwrites,
+                topic="Denní shrnutí Discord chatu"
+            )
+
+            set_env_value(ENV_FILE, "SUMMARY_CHANNEL_ID", str(channel.id))
+
+            embed = discord.Embed(
+                title="✅ Kanál pro shrnutí vytvořen",
+                description=f"Kanál {channel.mention} byl úspěšně vytvořen a nastaven pro denní shrnutí chatu.",
+                color=discord.Color.green()
+            )
+
+            embed.add_field(
+                name="Nastavení",
+                value=f"ID kanálu: `{channel.id}`\nID bylo automaticky přidáno do .env souboru."
+            )
+
+            await ctx.send(embed=embed, ephemeral=True)
+
+        except Exception as e:
+            await ctx.send(f"Chyba při vytváření kanálu pro shrnutí: {str(e)}", ephemeral=True)
+
     @commands.command(name="setup")
     @commands.has_permissions(administrator=True)
     async def setup_all(self, ctx):
@@ -154,6 +197,7 @@ class Setup(commands.Cog):
         await self.setup_counting(ctx)
         await self.setup_update(ctx)
         await self.setup_audit_log(ctx)
+        await self.setup_summary(ctx)
 
         embed = discord.Embed(
             title="✅ Nastavení dokončeno",
@@ -169,7 +213,8 @@ class Setup(commands.Cog):
                   "- GUILD_ID\n"
                   "- WELCOME_CHANNEL_ID\n"
                   "- YOUTUBE_API_KEY\n"
-                  "- YOUTUBE_CHANNEL_ID"
+                  "- YOUTUBE_CHANNEL_ID\n"
+                  "- OPENROUTER_API_KEY"
         )
 
         await ctx.send(embed=embed, ephemeral=True)
@@ -270,6 +315,22 @@ class Setup(commands.Cog):
                 error_messages.append(f"❌ Chyba při nastavování oprávnění pro welcome kanál: {str(e)}")
         else:
             error_messages.append("❌ ID welcome kanálu není nastaveno v .env souboru.")
+
+        # Nastavení oprávnění pro kanál shrnutí
+        if SUMMARY_CHANNEL_ID != 0:
+            try:
+                summary_channel = self.bot.get_channel(SUMMARY_CHANNEL_ID)
+                if summary_channel:
+                    # Nastavení oprávnění: všichni vidí, pouze admin a bot mohou psát
+                    await summary_channel.set_permissions(guild.default_role, send_messages=False, view_channel=True)
+                    await summary_channel.set_permissions(guild.me, send_messages=True, view_channel=True)
+                    success_messages.append(f"✅ Oprávnění pro kanál shrnutí {summary_channel.mention} byla nastavena.")
+                else:
+                    error_messages.append("❌ Kanál shrnutí nebyl nalezen.")
+            except Exception as e:
+                error_messages.append(f"❌ Chyba při nastavování oprávnění pro kanál shrnutí: {str(e)}")
+        else:
+            error_messages.append("❌ ID kanálu shrnutí není nastaveno v .env souboru.")
 
         # Vytvoření a odeslání embedu s výsledky
         embed = discord.Embed(

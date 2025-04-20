@@ -8,6 +8,9 @@ env/
 # Database files
 db/*.json
 
+# Log files
+log/
+
 # OS specific files
 .DS_Store
 Thumbs.db

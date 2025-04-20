@@ -179,6 +179,8 @@ class Utility(commands.Cog):
                 moderation_commands[cmd_name] = cmd_desc
             elif command.name in ["uptime", "discord", "dc", "prikazy", "commands", "help"]:
                 utility_commands[cmd_name] = cmd_desc
+            elif command.name in ["sumarizace-stepan", "ytlastvideosend"]:
+                admin_commands[cmd_name] = cmd_desc
             else:
                 other_commands[cmd_name] = cmd_desc
 
@@ -187,10 +189,31 @@ class Utility(commands.Cog):
             if not commands_dict:
                 return
 
+            # Maximální délka hodnoty pole v embedu
+            max_field_length = 1000  # Použijeme 1000 místo 1024 pro jistotu
+
             commands_text = ""
+            part_num = 1
+
             for cmd, desc in commands_dict.items():
-                commands_text += f"**{cmd}** - {desc}\n"
-            embed.add_field(name=category_name, value=commands_text, inline=False)
+                line = f"**{cmd}** - {desc}\n"
+
+                # Pokud by přidání této řádky překročilo limit, vytvoříme nové pole
+                if len(commands_text) + len(line) > max_field_length:
+                    # Přidáme aktuální text jako pole
+                    field_name = category_name if part_num == 1 else f"{category_name} (pokračování {part_num})"
+                    embed.add_field(name=field_name, value=commands_text, inline=False)
+
+                    # Resetujeme text a zvýšíme číslo části
+                    commands_text = line
+                    part_num += 1
+                else:
+                    commands_text += line
+
+            # Přidáme poslední pole, pokud obsahuje nějaký text
+            if commands_text:
+                field_name = category_name if part_num == 1 else f"{category_name} (pokračování {part_num})"
+                embed.add_field(name=field_name, value=commands_text, inline=False)
 
         # Přidání kategorií do embedu
         add_commands_to_embed(utility_commands, "Užitečné příkazy")
@@ -265,10 +288,31 @@ class Utility(commands.Cog):
             if not commands_dict:
                 return
 
+            # Maximální délka hodnoty pole v embedu
+            max_field_length = 1000  # Použijeme 1000 místo 1024 pro jistotu
+
             commands_text = ""
+            part_num = 1
+
             for cmd, desc in commands_dict.items():
-                commands_text += f"**{cmd}** - {desc}\n"
-            embed.add_field(name=category_name, value=commands_text, inline=False)
+                line = f"**{cmd}** - {desc}\n"
+
+                # Pokud by přidání této řádky překročilo limit, vytvoříme nové pole
+                if len(commands_text) + len(line) > max_field_length:
+                    # Přidáme aktuální text jako pole
+                    field_name = category_name if part_num == 1 else f"{category_name} (pokračování {part_num})"
+                    embed.add_field(name=field_name, value=commands_text, inline=False)
+
+                    # Resetujeme text a zvýšíme číslo části
+                    commands_text = line
+                    part_num += 1
+                else:
+                    commands_text += line
+
+            # Přidáme poslední pole, pokud obsahuje nějaký text
+            if commands_text:
+                field_name = category_name if part_num == 1 else f"{category_name} (pokračování {part_num})"
+                embed.add_field(name=field_name, value=commands_text, inline=False)
 
         # Přidání kategorií do embedu
         add_commands_to_embed(utility_commands, "Užitečné příkazy")

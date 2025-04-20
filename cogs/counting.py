@@ -13,7 +13,6 @@ class Counting(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.data = self.load_data()
-        self.bot.loop.create_task(self.update_channel_topic())
 
     def load_data(self):
         os.makedirs(os.path.dirname(COUNTING_SAVE_FILE), exist_ok=True)
@@ -51,24 +50,9 @@ class Counting(commands.Cog):
             json.dump(self.data, f, indent=2)
 
     async def update_channel_topic(self):
-        if not self.bot.is_ready():
-            await self.bot.wait_until_ready()
-
-        channel = self.bot.get_channel(COUNTING_CHANNEL_ID)
-        if not channel:
-            print(f"Counting channel with ID {COUNTING_CHANNEL_ID} not found!")
-            return
-
-        next_number = self.data["current_count"] + 1
-        new_topic = f"{COUNTING_TOPIC_PREFIX}{next_number}"
-
-        try:
-            await channel.edit(topic=new_topic)
-            print(f"Updated channel topic with next number: {next_number}")
-        except discord.Forbidden:
-            print("Bot doesn't have permission to edit channel topic")
-        except Exception as e:
-            print(f"Error updating channel topic: {e}")
+        # Funkce je prázdná, protože Discord blokuje časté aktualizace tématu kanálu
+        # a není potřeba ji používat
+        pass
 
     def update_user_stats(self, user_id, username, success=True):
         user_id = str(user_id)
@@ -143,7 +127,6 @@ class Counting(commands.Cog):
 
             self.update_user_stats(message.author.id, message.author.display_name, success=False)
             self.save_data()
-            await self.update_channel_topic()
             return
 
         if count == expected_count:
@@ -162,7 +145,6 @@ class Counting(commands.Cog):
                 await message.channel.send(f"🎊 **Dosáhli jste {count}!** Skvělá práce!")
 
             self.save_data()
-            await self.update_channel_topic()
         else:
             await message.add_reaction("❌")
             await message.channel.send(f"**{message.author.display_name}** pokazil počítání na **{count}**! Správné číslo bylo **{expected_count}**. Počítání začíná znovu od 1.")
@@ -171,7 +153,6 @@ class Counting(commands.Cog):
             self.data["failed_counts"] += 1
             self.update_user_stats(message.author.id, message.author.display_name, success=False)
             self.save_data()
-            await self.update_channel_topic()
 
     @commands.command(name="count")
     @commands.has_permissions(administrator=True)
@@ -227,7 +208,6 @@ class Counting(commands.Cog):
         self.data["current_count"] = 0
         self.data["last_user_id"] = None
         self.save_data()
-        await self.update_channel_topic()
 
         await ctx.send("Počítání bylo resetováno na 0.")
 
