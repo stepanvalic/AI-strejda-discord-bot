@@ -88,7 +88,7 @@ class Counting(commands.Cog):
 
 
         try:
-            count = int(message.content.strip())
+            count = int(message.content.strip(), 0)
         except ValueError:
 
             if not is_admin:
@@ -284,6 +284,44 @@ class Counting(commands.Cog):
                 embed.add_field(name="\u200b", value="\u200b", inline=True)
 
         embed.set_footer(text=f"Celkem počet selhání: {self.data['failed_counts']}")
+
+        await ctx.send(embed=embed)
+
+    @commands.command(name="countformats")
+    async def count_formats(self, ctx):
+        """Show the supported number formats for counting"""
+        # Smazání zprávy s příkazem
+        try:
+            await ctx.message.delete()
+        except Exception as e:
+            print(f"Chyba při mazání zprávy: {str(e)}")
+
+        embed = discord.Embed(
+            title="🔢 Podporované formáty čísel",
+            description="Při počítání můžete zadávat čísla v následujících formátech:",
+            color=discord.Color.light_grey()
+        )
+
+        embed.add_field(
+            name="Desítková (Decimal)",
+            value="Standardní čísla.\n*Příklad:* `123`",
+            inline=False
+        )
+        embed.add_field(
+            name="Šestnáctková (Hexadecimal)",
+            value="Čísla začínající prefixem `0x`.\n*Příklad:* `0xFF` (rovno 255)",
+            inline=False
+        )
+        embed.add_field(
+            name="Binární (Binary)",
+            value="Čísla začínající prefixem `0b`.\n*Příklad:* `0b1011` (rovno 11)",
+            inline=False
+        )
+        embed.add_field(
+            name="Osmičková (Octal)",
+            value="Čísla začínající prefixem `0o`.\n*Příklad:* `0o17` (rovno 15)",
+            inline=False
+        )
 
         await ctx.send(embed=embed)
 
