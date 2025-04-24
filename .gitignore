@@ -16,7 +16,9 @@
 # Keep db/sumar directory but ignore its contents
 !db/
 !db/sumar/
-db/sumar/*
+db/sumar/*.json
+db/*
+!db/sumar/
 !db/sumar/.gitkeep
 
 # Keep log directory but ignore its contents
