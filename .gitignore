@@ -1,37 +1,32 @@
-# Ignore everything
-*
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
 
-# But not these files...
-!.gitignore
-!*.py
-!*.md
-!requirements.txt
+# Virtual environments
+.venv/
+venv/
+env/
 
-# ...and not these directories...
-!cogs/
-!cogs/**
-!utils/
-!utils/**
+# Sensitive information
+.env
 
-# Keep db/sumar directory but ignore its contents
-!db/
-!db/sumar/
+# Database files (except db/sumar/.gitkeep)
+db/*.json
 db/sumar/*.json
 db/*
 !db/sumar/
 !db/sumar/.gitkeep
 
-# Keep log directory but ignore its contents
-!log/
-!log/.gitkeep
-log/*
-!log/.gitkeep
+# Log files
+log/*.log
 
-# Ignore sensitive files
-.env
-config.json
-__pycache__/
-*.py[cod]
-*$py.class
-.venv/
-venv/
+# IDE files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
