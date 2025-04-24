@@ -6,46 +6,37 @@ import datetime
 import google.generativeai as genai
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+import config
 
+# Load environment variables for API keys
 load_dotenv()
 
-# Load configuration from .env
+# Get API key from .env
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-AI_MODEL = os.getenv('AI_MODEL', 'gemini-2.0-flash')
-# Message batch size - must be set in .env
-# Force reload the .env file to get the latest values
-load_dotenv(override=True)
-AI_MESSAGES_BATCH_STR = os.getenv('AI_MESSAGES_BATCH')
-if not AI_MESSAGES_BATCH_STR:
-    print("[AI Mod] ERROR: AI_MESSAGES_BATCH not set in .env file. AI moderation will not function properly.")
-    AI_MESSAGES_BATCH = 0  # Will prevent processing
-else:
-    try:
-        AI_MESSAGES_BATCH = int(AI_MESSAGES_BATCH_STR)
-        print(f"[AI Mod] Using batch size of {AI_MESSAGES_BATCH} messages")
-    except ValueError:
-        print(f"[AI Mod] ERROR: Invalid AI_MESSAGES_BATCH value: {AI_MESSAGES_BATCH_STR}. AI moderation will not function properly.")
-        AI_MESSAGES_BATCH = 0  # Will prevent processing
-AI_MODERATION_SAVE_FILE = os.getenv('AI_MODERATION_SAVE_FILE', 'db/ai_moderation.json')
-AI_MODERATION_INTERVAL_MINUTES = int(os.getenv('AI_MODERATION_INTERVAL_MINUTES', 5))
+
+# Get configuration from config.py
+AI_MODEL = config.AI_MODEL
+AI_MESSAGES_BATCH = config.AI_MESSAGES_BATCH
+AI_MODERATION_SAVE_FILE = config.AI_MODERATION_SAVE_FILE
+AI_MODERATION_INTERVAL_MINUTES = config.AI_MODERATION_INTERVAL_MINUTES
 
 # Positive thresholds
-AI_POSITIVE_THRESHOLD_1 = int(os.getenv('AI_POSITIVE_THRESHOLD_1', 800))
-AI_POSITIVE_THRESHOLD_2 = int(os.getenv('AI_POSITIVE_THRESHOLD_2', 2000))
-AI_POSITIVE_THRESHOLD_3 = int(os.getenv('AI_POSITIVE_THRESHOLD_3', 5000))
+AI_POSITIVE_THRESHOLD_1 = config.AI_POSITIVE_THRESHOLD_1
+AI_POSITIVE_THRESHOLD_2 = config.AI_POSITIVE_THRESHOLD_2
+AI_POSITIVE_THRESHOLD_3 = config.AI_POSITIVE_THRESHOLD_3
 
 # Negative thresholds
-AI_NEGATIVE_THRESHOLD = int(os.getenv('AI_NEGATIVE_THRESHOLD', -30))
-AI_VERY_NEGATIVE_THRESHOLD = int(os.getenv('AI_VERY_NEGATIVE_THRESHOLD', -1000))
+AI_NEGATIVE_THRESHOLD = config.AI_NEGATIVE_THRESHOLD
+AI_VERY_NEGATIVE_THRESHOLD = config.AI_VERY_NEGATIVE_THRESHOLD
 
 # Penalty for very negative messages
-AI_NEGATIVE_PENALTY = int(os.getenv('AI_NEGATIVE_PENALTY', -50))
+AI_NEGATIVE_PENALTY = config.AI_NEGATIVE_PENALTY
 
 # Role IDs
-AI_POSITIVE_ROLE_ID_1 = os.getenv('AI_POSITIVE_ROLE_ID_1')
-AI_POSITIVE_ROLE_ID_2 = os.getenv('AI_POSITIVE_ROLE_ID_2')
-AI_POSITIVE_ROLE_ID_3 = os.getenv('AI_POSITIVE_ROLE_ID_3')
-AI_NEGATIVE_ROLE_ID = os.getenv('AI_NEGATIVE_ROLE_ID')
+AI_POSITIVE_ROLE_ID_1 = config.AI_POSITIVE_ROLE_ID_1
+AI_POSITIVE_ROLE_ID_2 = config.AI_POSITIVE_ROLE_ID_2
+AI_POSITIVE_ROLE_ID_3 = config.AI_POSITIVE_ROLE_ID_3
+AI_NEGATIVE_ROLE_ID = config.AI_NEGATIVE_ROLE_ID
 
 # Configure Gemini API
 genai.configure(api_key=GEMINI_API_KEY)
@@ -77,17 +68,8 @@ except ValueError:
 
 class AIModeration(commands.Cog):
     def __init__(self, bot):
-        # Force reload the .env file to get the latest values
-        load_dotenv(override=True)
-        # Get the batch size again to ensure we have the latest value
-        ai_messages_batch_str = os.getenv('AI_MESSAGES_BATCH')
-        if ai_messages_batch_str:
-            try:
-                global AI_MESSAGES_BATCH
-                AI_MESSAGES_BATCH = int(ai_messages_batch_str)
-                print(f"[AI Mod] Initialized with batch size of {AI_MESSAGES_BATCH} messages")
-            except ValueError:
-                pass
+        # Load configuration from config.py
+        print(f"[AI Mod] Initialized with batch size of {AI_MESSAGES_BATCH} messages")
 
         self.bot = bot
         self.pending_messages = {}  # {user_id: [messages]}

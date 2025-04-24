@@ -1,18 +1,35 @@
-# Environment variables
+# Ignore everything
+*
+
+# But not these files...
+!.gitignore
+!*.py
+!*.md
+!requirements.txt
+
+# ...and not these directories...
+!cogs/
+!cogs/**
+!utils/
+!utils/**
+
+# Keep db/sumar directory but ignore its contents
+!db/
+!db/sumar/
+db/sumar/*
+!db/sumar/.gitkeep
+
+# Keep log directory but ignore its contents
+!log/
+!log/.gitkeep
+log/*
+!log/.gitkeep
+
+# Ignore sensitive files
 .env
-
-# Python virtual environment
+config.json
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
 venv/
-env/
-
-# Database files
-db/*.json
-
-# Log files
-log/
-
-# OS specific files
-.DS_Store
-Thumbs.db
-
-__pycache__

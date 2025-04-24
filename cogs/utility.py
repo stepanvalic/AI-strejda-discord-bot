@@ -1,23 +1,13 @@
-import os
 import time
 import datetime
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
+import config
 
-load_dotenv()
-YOUTUBE_CHANNEL = os.getenv('YOUTUBE_CHANNEL_ID')
-try:
-    YOUTUBE_NOTIFICATION_CHANNEL_ID = int(os.getenv('YOUTUBE_NOTIFICATION_CHANNEL_ID', 0))
-except ValueError:
-    YOUTUBE_NOTIFICATION_CHANNEL_ID = 0
-    print("Warning: Invalid YOUTUBE_NOTIFICATION_CHANNEL_ID in .env file")
-
-try:
-    WELCOME_CHANNEL_ID = int(os.getenv('WELCOME_CHANNEL_ID', 0))
-except ValueError:
-    WELCOME_CHANNEL_ID = 0
-    print("Warning: Invalid WELCOME_CHANNEL_ID in .env file")
+# Get configuration from config.py
+YOUTUBE_CHANNEL = config.YOUTUBE_CHANNEL_ID
+YOUTUBE_NOTIFICATION_CHANNEL_ID = config.YOUTUBE_NOTIFICATION_CHANNEL_ID
+WELCOME_CHANNEL_ID = config.WELCOME_CHANNEL_ID
 
 START_TIME = time.time()
 

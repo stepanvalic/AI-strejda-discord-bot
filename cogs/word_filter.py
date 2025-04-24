@@ -4,10 +4,10 @@ import os
 import json
 import re
 from dotenv import load_dotenv
+import config
 
-# Načtení proměnných z .env souboru
-load_dotenv()
-AUDIT_LOG_CHANNEL_ID = int(os.getenv('AUDIT_LOG_CHANNEL_ID', 0))
+# Get configuration from config.py
+AUDIT_LOG_CHANNEL_ID = config.AUDIT_LOG_CHANNEL_ID
 
 # Výchozí blacklist rasistických a nevhodných slov
 DEFAULT_BLACKLISTED_WORDS = [

@@ -7,26 +7,18 @@ import asyncio
 from datetime import datetime, time, timedelta
 from dotenv import load_dotenv
 from utils import chat_db
+import config
 
-# Load environment variables
+# Load environment variables for API keys
 load_dotenv()
-CHAT_ID = os.getenv('SUMMARY_CHAT_ID', '')
-SUMMARY_CHANNEL_ID = os.getenv('SUMMARY_CHANNEL_ID', '')
+
+# Get API key from .env
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '')
-OPENROUTER_MODEL = os.getenv('OPENROUTER_MODEL', '')
 
-# Convert to integers
-try:
-    CHAT_ID = int(CHAT_ID)
-except ValueError:
-    CHAT_ID = 0
-    print("Warning: Invalid SUMMARY_CHAT_ID in .env file")
-
-try:
-    SUMMARY_CHANNEL_ID = int(SUMMARY_CHANNEL_ID)
-except ValueError:
-    SUMMARY_CHANNEL_ID = 0
-    print("Warning: Invalid SUMMARY_CHANNEL_ID in .env file")
+# Get configuration from config.py
+CHAT_ID = config.SUMMARY_CHAT_ID
+SUMMARY_CHANNEL_ID = config.SUMMARY_CHANNEL_ID
+OPENROUTER_MODEL = config.OPENROUTER_MODEL
 
 class ChatSummary(commands.Cog):
     def __init__(self, bot):

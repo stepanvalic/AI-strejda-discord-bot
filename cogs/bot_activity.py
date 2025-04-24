@@ -1,12 +1,6 @@
 import discord
 from discord.ext import commands, tasks
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-GUILD_ID = int(os.getenv('GUILD_ID', 0))
-ACTIVITY_BASE_TEXT = os.getenv('ACTIVITY_BASE_TEXT', 'Sleduji')
-ACTIVITY_FORMAT_TEXT = os.getenv('ACTIVITY_FORMAT_TEXT', '{count} darebáků')
+import config
 
 class BotActivity(commands.Cog):
     def __init__(self, bot):
@@ -18,9 +12,9 @@ class BotActivity(commands.Cog):
 
     @tasks.loop(minutes=5)
     async def change_status(self):
-        guild = self.bot.get_guild(GUILD_ID)
+        guild = self.bot.get_guild(config.GUILD_ID)
         member_count = guild.member_count if guild else 0
-        status = f"{ACTIVITY_BASE_TEXT} {ACTIVITY_FORMAT_TEXT.format(count=member_count)}"
+        status = f"{config.ACTIVITY_BASE_TEXT} {config.ACTIVITY_FORMAT_TEXT.format(count=member_count)}"
 
         await self.bot.change_presence(
             activity=discord.Activity(

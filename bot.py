@@ -3,14 +3,17 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 import colorama
-from colorama import Fore, Back, Style
+from colorama import Fore, Style
 from utils.permissions import check_permissions
+import config
 
 colorama.init(autoreset=True)
 
+# Load environment variables for sensitive data
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
-GUILD_ID = int(os.getenv('GUILD_ID', 0))
+# Use GUILD_ID from config.py
+GUILD_ID = config.GUILD_ID
 
 intents = discord.Intents.default()
 intents.members = True
@@ -90,9 +93,7 @@ async def load_extensions():
     await bot.load_extension("cogs.logger")
     print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}logger{Fore.MAGENTA} cog")
 
-    # Modul update_checker je deaktivován a bude zprovozněn později
-    # await bot.load_extension("cogs.update_checker")
-    # print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}update_checker{Fore.MAGENTA} cog")
+
 
 async def main():
     async with bot:

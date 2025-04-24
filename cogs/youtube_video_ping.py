@@ -1,32 +1,20 @@
 import discord
 from discord.ext import commands, tasks
-import os
-import json
 import aiohttp
 import datetime
-import re
-from dotenv import load_dotenv
 from utils import db
+import config
 
-load_dotenv()
-YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY')
-YOUTUBE_CHANNEL = os.getenv('YOUTUBE_CHANNEL_ID')
+# Get configuration from config.py
+YOUTUBE_CHANNEL = config.YOUTUBE_CHANNEL_ID
+YOUTUBE_NOTIFICATION_CHANNEL_ID = config.YOUTUBE_NOTIFICATION_CHANNEL_ID
+CHECK_INTERVAL_SECONDS = config.CHECK_INTERVAL_SECONDS
+YOUTUBE_API_KEY = config.YOUTUBE_API_KEY
 
+# Determine if channel ID is a username
 IS_USERNAME = YOUTUBE_CHANNEL.startswith('@')
 YOUTUBE_USERNAME = YOUTUBE_CHANNEL if IS_USERNAME else None
 YOUTUBE_CHANNEL_ID = None if IS_USERNAME else YOUTUBE_CHANNEL
-
-try:
-    YOUTUBE_NOTIFICATION_CHANNEL_ID = int(os.getenv('YOUTUBE_NOTIFICATION_CHANNEL_ID', 0))
-except ValueError:
-    YOUTUBE_NOTIFICATION_CHANNEL_ID = 0
-    print("Warning: Invalid YOUTUBE_NOTIFICATION_CHANNEL_ID in .env file")
-
-try:
-    CHECK_INTERVAL_SECONDS = int(os.getenv('CHECK_INTERVAL_SECONDS', 30))
-except ValueError:
-    CHECK_INTERVAL_SECONDS = 30
-    print("Warning: Invalid CHECK_INTERVAL_SECONDS in .env file")
 
 UPDATE_INTERVAL_SECONDS = 5 * 60
 

@@ -2,12 +2,12 @@ import os
 import json
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
+import config
 
-load_dotenv()
-COUNTING_CHANNEL_ID = int(os.getenv('COUNTING_CHANNEL_ID', 0))
-COUNTING_SAVE_FILE = os.getenv('COUNTING_SAVE_FILE', 'db/counting.json')
-COUNTING_TOPIC_PREFIX = os.getenv('COUNTING_TOPIC_PREFIX', 'Počítejte od 1 do nekonečna. Další číslo: ')
+# Get configuration from config.py
+COUNTING_CHANNEL_ID = config.COUNTING_CHANNEL_ID
+COUNTING_SAVE_FILE = config.COUNTING_SAVE_FILE
+COUNTING_TOPIC_PREFIX = config.COUNTING_TOPIC_PREFIX
 
 class Counting(commands.Cog):
     def __init__(self, bot):
@@ -238,6 +238,66 @@ class Counting(commands.Cog):
             embed.add_field(name=f"Pravidlo {i}", value=rule, inline=False)
 
         await ctx.send(embed=embed)
+
+    @commands.Cog.listener()
+    async def on_message_edit(self, before, after):
+        """Handle message edits in the counting channel"""
+        # Ignore if not in counting channel
+        if before.channel.id != COUNTING_CHANNEL_ID:
+            return
+
+        # Ignore bot messages
+        if before.author.bot:
+            return
+
+        # Ignore if content didn't change
+        if before.content == after.content:
+            return
+
+        # Check if the original message was a valid number
+        try:
+            original_number = int(before.content.strip())
+        except ValueError:
+            return  # Original message wasn't a number, ignore
+
+        # Check if the edited message is still a number
+        try:
+            new_number = int(after.content.strip())
+        except ValueError:
+            # If edited to non-number, delete it
+            await after.delete()
+            return
+
+        # If the number was changed, handle it
+        if original_number != new_number:
+            # Delete the edited message
+            await after.delete()
+
+            # Send a notification about the edit
+            await before.channel.send(
+                f"**{before.author.display_name}** upravil zprávu z **{original_number}** na **{new_number}**. "
+                f"Úpravy čísel nejsou povoleny."
+            )
+
+            # Create a webhook to send a message as the original user
+            try:
+                # Create a webhook in the channel
+                webhook = await before.channel.create_webhook(name="CountingHelper")
+
+                # Send the original number as the user
+                await webhook.send(
+                    content=str(original_number),
+                    username=before.author.display_name,
+                    avatar_url=before.author.display_avatar.url
+                )
+
+                # Delete the webhook after use
+                await webhook.delete()
+            except discord.Forbidden:
+                # If we don't have permission to create webhooks, just send the message normally
+                await before.channel.send(
+                    f"**{before.author.display_name}**: {original_number}"
+                )
 
     @commands.command(name="countstats")
     async def count_stats(self, ctx):

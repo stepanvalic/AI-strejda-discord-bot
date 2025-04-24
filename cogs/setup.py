@@ -1,53 +1,36 @@
-import os
+import importlib
 import discord
-import re
 from discord.ext import commands
-from dotenv import load_dotenv
+import config
 
-load_dotenv()
-ENV_FILE = '.env'
+# Get channel IDs from config
+YOUTUBE_NOTIFICATION_CHANNEL_ID = config.YOUTUBE_NOTIFICATION_CHANNEL_ID
+COUNTING_CHANNEL_ID = config.COUNTING_CHANNEL_ID
+WELCOME_CHANNEL_ID = config.WELCOME_CHANNEL_ID
+SUMMARY_CHANNEL_ID = config.SUMMARY_CHANNEL_ID
 
-# Načtení ID kanálů z .env souboru
-try:
-    YOUTUBE_NOTIFICATION_CHANNEL_ID = int(os.getenv('YOUTUBE_NOTIFICATION_CHANNEL_ID', 0))
-except ValueError:
-    YOUTUBE_NOTIFICATION_CHANNEL_ID = 0
-    print("Warning: Invalid YOUTUBE_NOTIFICATION_CHANNEL_ID in .env file")
-
-try:
-    COUNTING_CHANNEL_ID = int(os.getenv('COUNTING_CHANNEL_ID', 0))
-except ValueError:
-    COUNTING_CHANNEL_ID = 0
-    print("Warning: Invalid COUNTING_CHANNEL_ID in .env file")
-
-try:
-    WELCOME_CHANNEL_ID = int(os.getenv('WELCOME_CHANNEL_ID', 0))
-except ValueError:
-    WELCOME_CHANNEL_ID = 0
-    print("Warning: Invalid WELCOME_CHANNEL_ID in .env file")
-
-try:
-    SUMMARY_CHANNEL_ID = int(os.getenv('SUMMARY_CHANNEL_ID', 0))
-except ValueError:
-    SUMMARY_CHANNEL_ID = 0
-    print("Warning: Invalid SUMMARY_CHANNEL_ID in .env file")
-
-def set_env_value(file_path, key, value):
-    with open(file_path, 'r') as file:
+def update_config_value(key, value):
+    """Aktualizuje hodnotu v config.py a znovu načte modul"""
+    # Otevřeme config.py soubor
+    with open('config.py', 'r', encoding='utf-8') as file:
         lines = file.readlines()
 
-    key_exists = False
+    # Najdeme řádek s danou proměnnou
     for i, line in enumerate(lines):
-        if re.match(f'^{key}=.*', line):
-            lines[i] = f'{key}={value}\n'
-            key_exists = True
+        if line.startswith(f"{key} = "):
+            # Aktualizujeme hodnotu podle typu
+            if isinstance(value, str):
+                lines[i] = f'{key} = "{value}"\n'
+            else:
+                lines[i] = f'{key} = {value}\n'
             break
 
-    if not key_exists:
-        lines.append(f'{key}={value}\n')
-
-    with open(file_path, 'w') as file:
+    # Zapíšeme změny zpět do souboru
+    with open('config.py', 'w', encoding='utf-8') as file:
         file.writelines(lines)
+
+    # Znovu načteme modul config
+    importlib.reload(config)
 
 class Setup(commands.Cog):
     def __init__(self, bot):
@@ -73,7 +56,7 @@ class Setup(commands.Cog):
                 topic="YouTube oznámení o nových videích"
             )
 
-            set_env_value(ENV_FILE, "YOUTUBE_NOTIFICATION_CHANNEL_ID", str(channel.id))
+            update_config_value("YOUTUBE_NOTIFICATION_CHANNEL_ID", channel.id)
 
             embed = discord.Embed(
                 title="✅ YouTube kanál vytvořen",
@@ -83,7 +66,7 @@ class Setup(commands.Cog):
 
             embed.add_field(
                 name="Nastavení",
-                value=f"ID kanálu: `{channel.id}`\nID bylo automaticky přidáno do .env souboru."
+                value=f"ID kanálu: `{channel.id}`\nID bylo automaticky přidáno do konfiguračního souboru."
             )
 
             await ctx.send(embed=embed, ephemeral=True)
@@ -104,7 +87,7 @@ class Setup(commands.Cog):
                 topic="Počítejte od 1 do nekonečna. Další číslo: 1"
             )
 
-            set_env_value(ENV_FILE, "COUNTING_CHANNEL_ID", str(channel.id))
+            update_config_value("COUNTING_CHANNEL_ID", channel.id)
 
             embed = discord.Embed(
                 title="✅ Counting kanál vytvořen",
@@ -114,7 +97,7 @@ class Setup(commands.Cog):
 
             embed.add_field(
                 name="Nastavení",
-                value=f"ID kanálu: `{channel.id}`\nID bylo automaticky přidáno do .env souboru."
+                value=f"ID kanálu: `{channel.id}`\nID bylo automaticky přidáno do konfiguračního souboru."
             )
 
             await ctx.send(embed=embed, ephemeral=True)
@@ -122,36 +105,7 @@ class Setup(commands.Cog):
         except Exception as e:
             await ctx.send(f"Chyba při vytváření counting kanálu: {str(e)}", ephemeral=True)
 
-    @commands.command(name="setupupdate")
-    @commands.has_permissions(administrator=True)
-    async def setup_update(self, ctx):
-        guild = ctx.guild
 
-        channel_name = "【📌】𝕤𝕚𝕧𝕪𝕒𝕡𝕚𝕯𝕒𝕘𝕚"
-
-        try:
-            channel = await guild.create_text_channel(
-                name=channel_name,
-                topic="Oznámení o aktualizacích bota"
-            )
-
-            set_env_value(ENV_FILE, "UPDATE_CHECK_CHANNEL_ID", str(channel.id))
-
-            embed = discord.Embed(
-                title="✅ Kanál pro aktualizace vytvořen",
-                description=f"Kanál {channel.mention} byl úspěšně vytvořen a nastaven pro oznámení o aktualizacích.",
-                color=discord.Color.green()
-            )
-
-            embed.add_field(
-                name="Nastavení",
-                value=f"ID kanálu: `{channel.id}`\nID bylo automaticky přidáno do .env souboru."
-            )
-
-            await ctx.send(embed=embed, ephemeral=True)
-
-        except Exception as e:
-            await ctx.send(f"Chyba při vytváření kanálu pro aktualizace: {str(e)}", ephemeral=True)
 
     @commands.command(name="setup_summary")
     @commands.has_permissions(administrator=True)
@@ -172,7 +126,7 @@ class Setup(commands.Cog):
                 topic="Denní shrnutí Discord chatu"
             )
 
-            set_env_value(ENV_FILE, "SUMMARY_CHANNEL_ID", str(channel.id))
+            update_config_value("SUMMARY_CHANNEL_ID", channel.id)
 
             embed = discord.Embed(
                 title="✅ Kanál pro shrnutí vytvořen",
@@ -182,7 +136,7 @@ class Setup(commands.Cog):
 
             embed.add_field(
                 name="Nastavení",
-                value=f"ID kanálu: `{channel.id}`\nID bylo automaticky přidáno do .env souboru."
+                value=f"ID kanálu: `{channel.id}`\nID bylo automaticky přidáno do konfiguračního souboru."
             )
 
             await ctx.send(embed=embed, ephemeral=True)
@@ -195,25 +149,21 @@ class Setup(commands.Cog):
     async def setup_all(self, ctx):
         await self.setup_youtube(ctx)
         await self.setup_counting(ctx)
-        await self.setup_update(ctx)
         await self.setup_audit_log(ctx)
         await self.setup_summary(ctx)
 
         embed = discord.Embed(
             title="✅ Nastavení dokončeno",
-            description="Všechny kanály byly úspěšně vytvořeny a nastaveny v .env souboru.",
+            description="Všechny kanály byly úspěšně vytvořeny a nastaveny v konfiguračním souboru.",
             color=discord.Color.green()
         )
 
         embed.add_field(
             name="Nastavení",
-            value="ID kanálů byla automaticky přidána do .env souboru.\n\n"
-                  "Nezapomeňte nastavit ostatní proměnné v .env souboru:\n"
+            value="ID kanálů byla automaticky přidána do konfiguračního souboru.\n\n"
+                  "Nezapomeňte nastavit API klíče v .env souboru:\n"
                   "- DISCORD_TOKEN\n"
-                  "- GUILD_ID\n"
-                  "- WELCOME_CHANNEL_ID\n"
-                  "- YOUTUBE_API_KEY\n"
-                  "- YOUTUBE_CHANNEL_ID\n"
+                  "- GEMINI_API_KEY\n"
                   "- OPENROUTER_API_KEY"
         )
 
@@ -240,8 +190,8 @@ class Setup(commands.Cog):
                 topic="Automatický audit log serveru"
             )
 
-            # Aktualizujeme .env soubor
-            self.update_env_variable("AUDIT_LOG_CHANNEL_ID", str(channel.id))
+            # Aktualizujeme config soubor
+            update_config_value("AUDIT_LOG_CHANNEL_ID", channel.id)
 
             await ctx.send(f"Vytvořen nový kanál pro audit log: {channel.mention}", ephemeral=True)
 
@@ -282,7 +232,7 @@ class Setup(commands.Cog):
             except Exception as e:
                 error_messages.append(f"❌ Chyba při nastavování oprávnění pro YouTube kanál: {str(e)}")
         else:
-            error_messages.append("❌ ID YouTube kanálu není nastaveno v .env souboru.")
+            error_messages.append("❌ ID YouTube kanálu není nastaveno v konfiguračním souboru.")
 
         # Nastavení oprávnění pro kanál na počítání
         if COUNTING_CHANNEL_ID != 0:
@@ -298,7 +248,7 @@ class Setup(commands.Cog):
             except Exception as e:
                 error_messages.append(f"❌ Chyba při nastavování oprávnění pro kanál na počítání: {str(e)}")
         else:
-            error_messages.append("❌ ID kanálu na počítání není nastaveno v .env souboru.")
+            error_messages.append("❌ ID kanálu na počítání není nastaveno v konfiguračním souboru.")
 
         # Nastavení oprávnění pro welcome kanál
         if WELCOME_CHANNEL_ID != 0:
@@ -314,7 +264,7 @@ class Setup(commands.Cog):
             except Exception as e:
                 error_messages.append(f"❌ Chyba při nastavování oprávnění pro welcome kanál: {str(e)}")
         else:
-            error_messages.append("❌ ID welcome kanálu není nastaveno v .env souboru.")
+            error_messages.append("❌ ID welcome kanálu není nastaveno v konfiguračním souboru.")
 
         # Nastavení oprávnění pro kanál shrnutí
         if SUMMARY_CHANNEL_ID != 0:
@@ -330,7 +280,7 @@ class Setup(commands.Cog):
             except Exception as e:
                 error_messages.append(f"❌ Chyba při nastavování oprávnění pro kanál shrnutí: {str(e)}")
         else:
-            error_messages.append("❌ ID kanálu shrnutí není nastaveno v .env souboru.")
+            error_messages.append("❌ ID kanálu shrnutí není nastaveno v konfiguračním souboru.")
 
         # Vytvoření a odeslání embedu s výsledky
         embed = discord.Embed(

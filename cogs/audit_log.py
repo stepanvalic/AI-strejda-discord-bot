@@ -1,15 +1,14 @@
 import discord
 from discord.ext import commands
-import os
 import datetime
-from dotenv import load_dotenv
 import asyncio
+import importlib
+import config
 
-# Načtení proměnných z .env souboru
-load_dotenv()
-AUDIT_LOG_CHANNEL_ID = int(os.getenv('AUDIT_LOG_CHANNEL_ID', 0))
-GUILD_ID = int(os.getenv('GUILD_ID', 0))
-COUNTING_CHANNEL_ID = int(os.getenv('COUNTING_CHANNEL_ID', 0))
+# Get configuration from config.py
+AUDIT_LOG_CHANNEL_ID = config.AUDIT_LOG_CHANNEL_ID
+GUILD_ID = config.GUILD_ID
+COUNTING_CHANNEL_ID = config.COUNTING_CHANNEL_ID
 
 class AuditLog(commands.Cog):
     def __init__(self, bot):
@@ -28,7 +27,7 @@ class AuditLog(commands.Cog):
             else:
                 print(f"Varování: Audit log kanál s ID {AUDIT_LOG_CHANNEL_ID} nebyl nalezen!")
         else:
-            print("Audit log kanál není nastaven v .env souboru (AUDIT_LOG_CHANNEL_ID)")
+            print("Audit log kanál není nastaven v konfiguračním souboru (AUDIT_LOG_CHANNEL_ID)")
 
     async def send_log(self, embed):
         """Odešle audit log do určeného kanálu"""
@@ -488,8 +487,8 @@ class AuditLog(commands.Cog):
                 await ctx.send(f"Nastala chyba při vytváření kanálu: {e}", ephemeral=True)
                 return
 
-        # Aktualizujeme .env soubor
-        self.update_env_file('AUDIT_LOG_CHANNEL_ID', str(channel.id))
+        # Aktualizujeme konfigurační soubor
+        self.update_config_value('AUDIT_LOG_CHANNEL_ID', channel.id)
 
         # Aktualizujeme proměnnou v paměti
         global AUDIT_LOG_CHANNEL_ID
@@ -507,37 +506,30 @@ class AuditLog(commands.Cog):
 
         await ctx.send(f"Kanál {channel.mention} byl nastaven jako audit log.", ephemeral=True)
 
-    def update_env_file(self, key, value):
-        """Aktualizuje hodnotu v .env souboru"""
-        env_path = '.env'
+    def update_config_value(self, key, value):
+        """Aktualizuje hodnotu v config.py a znovu načte modul"""
+        # Otevřeme config.py soubor
+        with open('config.py', 'r', encoding='utf-8') as file:
+            lines = file.readlines()
 
-        try:
-            with open(env_path, 'r') as file:
-                lines = file.readlines()
+        # Najdeme řádek s danou proměnnou
+        for i, line in enumerate(lines):
+            if line.startswith(f"{key} = "):
+                # Aktualizujeme hodnotu podle typu
+                if isinstance(value, str):
+                    lines[i] = f'{key} = "{value}"\n'
+                else:
+                    lines[i] = f'{key} = {value}\n'
+                break
 
-            # Hledáme řádek s daným klíčem
-            key_exists = False
-            for i, line in enumerate(lines):
-                if line.startswith(f"{key}=") or line.startswith(f"# {key}="):
-                    lines[i] = f"{key}={value}\n"
-                    key_exists = True
-                    break
+        # Zapíšeme změny zpět do souboru
+        with open('config.py', 'w', encoding='utf-8') as file:
+            file.writelines(lines)
 
-            # Pokud klíč neexistuje, přidáme ho na konec souboru
-            if not key_exists:
-                lines.append(f"{key}={value}\n")
+        print(f"Hodnota {key} byla aktualizována v config.py")
 
-            # Zapíšeme změny zpět do souboru
-            with open(env_path, 'w') as file:
-                file.writelines(lines)
-
-            print(f"Hodnota {key} byla aktualizována v .env souboru")
-
-            # Znovu načteme .env soubor
-            load_dotenv(override=True)
-
-        except Exception as e:
-            print(f"Chyba při aktualizaci .env souboru: {e}")
+        # Znovu načteme modul config
+        importlib.reload(config)
 
     def get_channel_type(self, channel):
         """Vrátí typ kanálu v čitelné podobě"""
