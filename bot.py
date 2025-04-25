@@ -1,19 +1,15 @@
-import os
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
 import colorama
 from colorama import Fore, Style
 from utils.permissions import check_permissions
-import config
+import config_loader
 
 colorama.init(autoreset=True)
 
-# Load environment variables for sensitive data
-load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN')
-# Use GUILD_ID from config.py
-GUILD_ID = config.GUILD_ID
+# Get configuration from config_loader
+TOKEN = config_loader.get_discord_token()
+GUILD_ID = config_loader.get_guild_id()
 
 intents = discord.Intents.default()
 intents.members = True
