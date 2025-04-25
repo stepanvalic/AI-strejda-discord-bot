@@ -3,13 +3,13 @@ from discord.ext import commands, tasks
 import aiohttp
 import datetime
 from utils import db
-import config
+import config_loader
 
-# Get configuration from config.py
-YOUTUBE_CHANNEL = config.YOUTUBE_CHANNEL_ID
-YOUTUBE_NOTIFICATION_CHANNEL_ID = config.YOUTUBE_NOTIFICATION_CHANNEL_ID
-CHECK_INTERVAL_SECONDS = config.CHECK_INTERVAL_SECONDS
-YOUTUBE_API_KEY = config.YOUTUBE_API_KEY
+# Get configuration from config_loader
+YOUTUBE_CHANNEL = config_loader.get_youtube_channel_id()
+YOUTUBE_NOTIFICATION_CHANNEL_ID = config_loader.get_youtube_notification_channel_id()
+CHECK_INTERVAL_SECONDS = config_loader.get_youtube_check_interval()
+YOUTUBE_API_KEY = config_loader.get_youtube_api_key()
 
 # Determine if channel ID is a username
 IS_USERNAME = YOUTUBE_CHANNEL.startswith('@')

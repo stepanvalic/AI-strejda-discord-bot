@@ -2,12 +2,12 @@ import os
 import json
 import discord
 from discord.ext import commands
-import config
+import config_loader
 
-# Get configuration from config.py
-COUNTING_CHANNEL_ID = config.COUNTING_CHANNEL_ID
-COUNTING_SAVE_FILE = config.COUNTING_SAVE_FILE
-COUNTING_TOPIC_PREFIX = config.COUNTING_TOPIC_PREFIX
+# Get configuration from config_loader
+COUNTING_CHANNEL_ID = config_loader.get_counting_channel_id()
+COUNTING_SAVE_FILE = config_loader.get_counting_save_file()
+COUNTING_TOPIC_PREFIX = config_loader.get_counting_topic_prefix()
 
 class Counting(commands.Cog):
     def __init__(self, bot):

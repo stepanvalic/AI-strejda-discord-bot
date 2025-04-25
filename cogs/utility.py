@@ -2,12 +2,12 @@ import time
 import datetime
 import discord
 from discord.ext import commands
-import config
+import config_loader
 
-# Get configuration from config.py
-YOUTUBE_CHANNEL = config.YOUTUBE_CHANNEL_ID
-YOUTUBE_NOTIFICATION_CHANNEL_ID = config.YOUTUBE_NOTIFICATION_CHANNEL_ID
-WELCOME_CHANNEL_ID = config.WELCOME_CHANNEL_ID
+# Get configuration from config_loader
+YOUTUBE_CHANNEL = config_loader.get_youtube_channel_id()
+YOUTUBE_NOTIFICATION_CHANNEL_ID = config_loader.get_youtube_notification_channel_id()
+WELCOME_CHANNEL_ID = config_loader.get_welcome_channel_id()
 
 START_TIME = time.time()
 

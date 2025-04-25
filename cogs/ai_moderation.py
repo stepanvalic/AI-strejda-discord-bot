@@ -6,37 +6,40 @@ import datetime
 import google.generativeai as genai
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
-import config
+import config_loader
 
 # Load environment variables for API keys
 load_dotenv()
 
 # Get API key from .env
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+GEMINI_API_KEY = config_loader.get_gemini_api_key()
 
-# Get configuration from config.py
-AI_MODEL = config.AI_MODEL
-AI_MESSAGES_BATCH = config.AI_MESSAGES_BATCH
-AI_MODERATION_SAVE_FILE = config.AI_MODERATION_SAVE_FILE
-AI_MODERATION_INTERVAL_MINUTES = config.AI_MODERATION_INTERVAL_MINUTES
+# Get configuration from config_loader
+AI_MODEL = config_loader.get_ai_model()
+AI_MESSAGES_BATCH = config_loader.get_ai_messages_batch()
+AI_MODERATION_SAVE_FILE = config_loader.get_ai_moderation_save_file()
+AI_MODERATION_INTERVAL_MINUTES = config_loader.get_ai_moderation_interval()
 
-# Positive thresholds
-AI_POSITIVE_THRESHOLD_1 = config.AI_POSITIVE_THRESHOLD_1
-AI_POSITIVE_THRESHOLD_2 = config.AI_POSITIVE_THRESHOLD_2
-AI_POSITIVE_THRESHOLD_3 = config.AI_POSITIVE_THRESHOLD_3
+# Get thresholds from config
+thresholds = config_loader.get_ai_positive_thresholds()
+AI_POSITIVE_THRESHOLD_1 = thresholds['level_1']
+AI_POSITIVE_THRESHOLD_2 = thresholds['level_2']
+AI_POSITIVE_THRESHOLD_3 = thresholds['level_3']
 
 # Negative thresholds
-AI_NEGATIVE_THRESHOLD = config.AI_NEGATIVE_THRESHOLD
-AI_VERY_NEGATIVE_THRESHOLD = config.AI_VERY_NEGATIVE_THRESHOLD
+negative_thresholds = config_loader.get_ai_negative_thresholds()
+AI_NEGATIVE_THRESHOLD = negative_thresholds['negative']
+AI_VERY_NEGATIVE_THRESHOLD = negative_thresholds['very_negative']
 
 # Penalty for very negative messages
-AI_NEGATIVE_PENALTY = config.AI_NEGATIVE_PENALTY
+AI_NEGATIVE_PENALTY = config_loader.get_ai_negative_penalty()
 
 # Role IDs
-AI_POSITIVE_ROLE_ID_1 = config.AI_POSITIVE_ROLE_ID_1
-AI_POSITIVE_ROLE_ID_2 = config.AI_POSITIVE_ROLE_ID_2
-AI_POSITIVE_ROLE_ID_3 = config.AI_POSITIVE_ROLE_ID_3
-AI_NEGATIVE_ROLE_ID = config.AI_NEGATIVE_ROLE_ID
+role_ids = config_loader.get_ai_role_ids()
+AI_POSITIVE_ROLE_ID_1 = role_ids['positive_1']
+AI_POSITIVE_ROLE_ID_2 = role_ids['positive_2']
+AI_POSITIVE_ROLE_ID_3 = role_ids['positive_3']
+AI_NEGATIVE_ROLE_ID = role_ids['negative']
 
 # Configure Gemini API
 genai.configure(api_key=GEMINI_API_KEY)
@@ -68,7 +71,7 @@ except ValueError:
 
 class AIModeration(commands.Cog):
     def __init__(self, bot):
-        # Load configuration from config.py
+        # Load configuration from config_loader
         print(f"[AI Mod] Initialized with batch size of {AI_MESSAGES_BATCH} messages")
 
         self.bot = bot

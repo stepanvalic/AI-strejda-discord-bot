@@ -3,16 +3,17 @@ import sys
 import logging
 import datetime
 import importlib
+import json
 from logging.handlers import RotatingFileHandler
 from discord.ext import commands
 import colorama
 from colorama import Fore, Style
-import config
+import config_loader
 
-# Get configuration from config.py
-LOG_LEVEL = config.LOG_LEVEL.upper()
-LOG_MAX_SIZE = config.LOG_MAX_SIZE  # 5 MB default size
-LOG_BACKUP_COUNT = config.LOG_BACKUP_COUNT  # Number of backup files
+# Get configuration from config_loader
+LOG_LEVEL = config_loader.get_log_level().upper()
+LOG_MAX_SIZE = config_loader.get_log_max_size()  # 5 MB default size
+LOG_BACKUP_COUNT = config_loader.get_log_backup_count()  # Number of backup files
 
 # Mapování textových úrovní logování na konstanty z modulu logging
 LOG_LEVELS = {
@@ -204,33 +205,55 @@ class LoggerCog(commands.Cog):
         await ctx.send(f"Úroveň logování nastavena na {level}")
 
     def _update_config_value(self, key, value):
-        """Aktualizuje hodnotu v config.py a znovu načte modul"""
+        """Updates a value in config.json using a dot-notation path"""
         try:
-            # Otevřeme config.py soubor
-            with open('config.py', 'r', encoding='utf-8') as file:
-                lines = file.readlines()
+            # Map old config keys to new dot-notation paths
+            key_mapping = {
+                'LOG_LEVEL': 'logger.level',
+                'LOG_MAX_SIZE': 'logger.max_size',
+                'LOG_BACKUP_COUNT': 'logger.backup_count'
+            }
 
-            # Najdeme řádek s danou proměnnou
-            for i, line in enumerate(lines):
-                if line.startswith(f"{key} = "):
-                    # Aktualizujeme hodnotu podle typu
-                    if isinstance(value, str):
-                        lines[i] = f'{key} = "{value}"\n'
-                    else:
-                        lines[i] = f'{key} = {value}\n'
-                    break
+            # Convert old key to new path
+            key_path = key_mapping.get(key, key)
 
-            # Zapíšeme změny zpět do souboru
-            with open('config.py', 'w', encoding='utf-8') as file:
-                file.writelines(lines)
+            # Load the current config
+            with open('config.json', 'r', encoding='utf-8') as file:
+                config = json.load(file)
 
-            self.logger.info(f"Hodnota {key} byla aktualizována v config.py")
+            # Parse the key path
+            keys = key_path.split('.')
 
-            # Znovu načteme modul config
-            importlib.reload(config)
+            # Navigate to the nested location
+            current = config
+            for i, k in enumerate(keys[:-1]):
+                if k not in current:
+                    current[k] = {}
+                current = current[k]
+
+            # Update the value
+            current[keys[-1]] = value
+
+            # Write the updated config back to the file
+            with open('config.json', 'w', encoding='utf-8') as file:
+                json.dump(config, file, indent=2)
+
+            self.logger.info(f"Value {key_path} was updated in config.json")
+
+            # Reload the config_loader module to reflect changes
+            importlib.reload(config_loader)
+
+            # Update global variables
+            global LOG_LEVEL, LOG_MAX_SIZE, LOG_BACKUP_COUNT
+            if key == 'LOG_LEVEL':
+                LOG_LEVEL = value.upper()
+            elif key == 'LOG_MAX_SIZE':
+                LOG_MAX_SIZE = value
+            elif key == 'LOG_BACKUP_COUNT':
+                LOG_BACKUP_COUNT = value
 
         except Exception as e:
-            self.logger.error(f"Chyba při aktualizaci config.py: {e}")
+            self.logger.error(f"Error updating config.json: {e}")
 
 async def setup(bot):
     await bot.add_cog(LoggerCog(bot))

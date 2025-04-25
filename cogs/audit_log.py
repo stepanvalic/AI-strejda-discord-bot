@@ -3,12 +3,13 @@ from discord.ext import commands
 import datetime
 import asyncio
 import importlib
-import config
+import json
+import config_loader
 
-# Get configuration from config.py
-AUDIT_LOG_CHANNEL_ID = config.AUDIT_LOG_CHANNEL_ID
-GUILD_ID = config.GUILD_ID
-COUNTING_CHANNEL_ID = config.COUNTING_CHANNEL_ID
+# Get configuration from config_loader
+AUDIT_LOG_CHANNEL_ID = config_loader.get_audit_log_channel_id()
+GUILD_ID = config_loader.get_guild_id()
+COUNTING_CHANNEL_ID = config_loader.get_counting_channel_id()
 
 class AuditLog(commands.Cog):
     def __init__(self, bot):
@@ -507,29 +508,44 @@ class AuditLog(commands.Cog):
         await ctx.send(f"Kanál {channel.mention} byl nastaven jako audit log.", ephemeral=True)
 
     def update_config_value(self, key, value):
-        """Aktualizuje hodnotu v config.py a znovu načte modul"""
-        # Otevřeme config.py soubor
-        with open('config.py', 'r', encoding='utf-8') as file:
-            lines = file.readlines()
+        """Updates a value in config.json using a dot-notation path"""
+        # Map old config keys to new dot-notation paths
+        key_mapping = {
+            'AUDIT_LOG_CHANNEL_ID': 'audit_log.channel_id',
+            'COUNTING_CHANNEL_ID': 'counting_game.channel_id',
+            'WELCOME_CHANNEL_ID': 'discord.welcome_channel_id',
+            'SUMMARY_CHANNEL_ID': 'chat_summary.channel_id',
+            'YOUTUBE_NOTIFICATION_CHANNEL_ID': 'youtube.notification_channel_id'
+        }
 
-        # Najdeme řádek s danou proměnnou
-        for i, line in enumerate(lines):
-            if line.startswith(f"{key} = "):
-                # Aktualizujeme hodnotu podle typu
-                if isinstance(value, str):
-                    lines[i] = f'{key} = "{value}"\n'
-                else:
-                    lines[i] = f'{key} = {value}\n'
-                break
+        # Convert old key to new path
+        key_path = key_mapping.get(key, key)
 
-        # Zapíšeme změny zpět do souboru
-        with open('config.py', 'w', encoding='utf-8') as file:
-            file.writelines(lines)
+        # Load the current config
+        with open('config.json', 'r', encoding='utf-8') as file:
+            config = json.load(file)
 
-        print(f"Hodnota {key} byla aktualizována v config.py")
+        # Parse the key path
+        keys = key_path.split('.')
 
-        # Znovu načteme modul config
-        importlib.reload(config)
+        # Navigate to the nested location
+        current = config
+        for i, k in enumerate(keys[:-1]):
+            if k not in current:
+                current[k] = {}
+            current = current[k]
+
+        # Update the value
+        current[keys[-1]] = value
+
+        # Write the updated config back to the file
+        with open('config.json', 'w', encoding='utf-8') as file:
+            json.dump(config, file, indent=2)
+
+        print(f"Value {key_path} was updated in config.json")
+
+        # Reload the config_loader module to reflect changes
+        importlib.reload(config_loader)
 
     def get_channel_type(self, channel):
         """Vrátí typ kanálu v čitelné podobě"""
