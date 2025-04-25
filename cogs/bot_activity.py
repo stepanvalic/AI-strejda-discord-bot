@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands, tasks
-import config
+import config_loader
 
 class BotActivity(commands.Cog):
     def __init__(self, bot):
@@ -12,9 +12,9 @@ class BotActivity(commands.Cog):
 
     @tasks.loop(minutes=5)
     async def change_status(self):
-        guild = self.bot.get_guild(config.GUILD_ID)
+        guild = self.bot.get_guild(config_loader.get_guild_id())
         member_count = guild.member_count if guild else 0
-        status = f"{config.ACTIVITY_BASE_TEXT} {config.ACTIVITY_FORMAT_TEXT.format(count=member_count)}"
+        status = f"{config_loader.get_activity_base_text()} {config_loader.get_activity_format_text().format(count=member_count)}"
 
         await self.bot.change_presence(
             activity=discord.Activity(
