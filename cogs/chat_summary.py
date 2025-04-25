@@ -75,9 +75,6 @@ class ChatSummary(commands.Cog):
 
         # Check if we already have a summary for yesterday
         existing_summary = chat_db.get_summary_by_date(yesterday)
-        if existing_summary:
-            print(f"[Summary] Summary for {yesterday} already exists, skipping")
-            return
 
         # Get messages from yesterday
         messages = chat_db.get_messages_by_date(yesterday)
@@ -87,6 +84,20 @@ class ChatSummary(commands.Cog):
             return
 
         print(f"[Summary] Found {len(messages)} messages for {yesterday}")
+
+        # If a summary already exists, check if it was manually created
+        if existing_summary:
+            # Check if it was manually created (has a requested_by field or was created during the day)
+            is_manual = "requested_by" in existing_summary or (
+                "timestamp" in existing_summary and
+                existing_summary["timestamp"].startswith(yesterday)
+            )
+
+            if is_manual:
+                print(f"[Summary] Manual summary for {yesterday} found, regenerating it")
+            else:
+                print(f"[Summary] Automatic summary for {yesterday} already exists, skipping")
+                return
 
         # Generate summary
         summary = await self.generate_summary(messages, yesterday)
@@ -105,7 +116,8 @@ class ChatSummary(commands.Cog):
             "message_count": len(messages),
             "summary": summary,
             "timestamp": datetime.now().isoformat(),
-            "topic_message_ids": topic_links
+            "topic_message_ids": topic_links,
+            "auto_generated": True  # Mark as automatically generated
         }
 
         chat_db.save_summary(summary_data)
@@ -416,7 +428,9 @@ class ChatSummary(commands.Cog):
             "message_count": len(messages),
             "summary": summary,
             "timestamp": datetime.now().isoformat(),
-            "topic_message_ids": topic_links
+            "topic_message_ids": topic_links,
+            "requested_by": str(ctx.author.id),
+            "manual": True  # Mark as manually created
         }
 
         chat_db.save_summary(summary_data)
@@ -490,7 +504,8 @@ class ChatSummary(commands.Cog):
                 "summary": summary,
                 "timestamp": datetime.now().isoformat(),
                 "topic_message_ids": topic_links,
-                "requested_by": str(ctx.author.id)
+                "requested_by": str(ctx.author.id),
+                "manual": True  # Mark as manually created
             }
 
             # Send summary to user via DM
@@ -574,6 +589,37 @@ class ChatSummary(commands.Cog):
             print(f"[Summary] Could not send DM to {user.display_name} - DMs disabled")
         except Exception as e:
             print(f"[Summary] Error sending summary DM: {e}")
+
+    @commands.command(name="pocetzpravzaden")
+    @commands.has_permissions(administrator=True)
+    async def message_count_today(self, ctx):
+        """Zobrazí počet zpráv v sumarizačním chatu za dnešní den (admin only)"""
+        # Get today's date
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # Get messages from today
+        try:
+            messages = chat_db.get_messages_by_date(today)
+            message_count = len(messages)
+
+            # Format date for display (YYYY-MM-DD to DD/MM/YYYY)
+            display_date = f"{today[8:10]}/{today[5:7]}/{today[0:4]}"
+
+            # Create embed
+            embed = discord.Embed(
+                title=f"📊 Statistika zpráv za {display_date}",
+                description=f"V sumarizačním chatu bylo dnes odesláno **{message_count}** zpráv.",
+                color=discord.Color.blue()
+            )
+
+            embed.set_footer(text=f"Kanál: {CHAT_ID}")
+            embed.timestamp = datetime.now()
+
+            await ctx.send(embed=embed, ephemeral=True)
+
+        except Exception as e:
+            print(f"[Summary] Error getting message count for today: {e}")
+            await ctx.send(f"Chyba při získávání počtu zpráv: {e}", ephemeral=True)
 
     @user_summary.error
     async def user_summary_error(self, ctx, error):
