@@ -175,6 +175,24 @@ class Counting(commands.Cog):
             self.update_user_stats(message.author.id, message.author.display_name, success=False)
             self.save_data()
 
+    async def get_or_create_webhook(self, channel):
+        """Získá nebo vytvoří webhook pro daný kanál"""
+        # Nejprve zkusíme najít existující webhook
+        webhooks = await channel.webhooks()
+        for webhook in webhooks:
+            if webhook.name == "CountingHelper":
+                return webhook
+
+        # Pokud webhook neexistuje, vytvoříme nový
+        try:
+            return await channel.create_webhook(name="CountingHelper")
+        except discord.Forbidden:
+            print("Bot doesn't have permission to create webhooks")
+            return None
+        except Exception as e:
+            print(f"Error creating webhook: {e}")
+            return None
+
     @commands.Cog.listener()
     async def on_message_edit(self, before, after):
         """Sleduje úpravy zpráv v kanálu počítání"""
@@ -195,19 +213,39 @@ class Counting(commands.Cog):
             cached_message = self.message_cache[before.id]
             count = cached_message["count"]
             author_name = cached_message["author_name"]
+            author_id = cached_message["author_id"]
 
             try:
                 # Smazání upravené zprávy
                 await after.delete()
 
-                # Poslání nové zprávy s původním číslem
-                bot_message = await before.channel.send(
-                    f"**{author_name}** upravil zprávu s číslem **{count}**. "
-                    f"Upravování zpráv není povoleno! Zde je původní číslo: **{count}**"
-                )
+                # Získání objektu uživatele pro avatar
+                user = self.bot.get_user(author_id)
+                avatar_url = user.display_avatar.url if user else None
 
-                # Přidání reakce na novou zprávu
-                await bot_message.add_reaction("✅")
+                # Získání nebo vytvoření webhooků
+                webhook = await self.get_or_create_webhook(before.channel)
+
+                if webhook:
+                    # Nejprve pošleme informační zprávu o tom, že došlo k úpravě
+                    await before.channel.send(
+                        f"**{author_name}** upravil zprávu s číslem **{count}**. "
+                        f"Upravování zpráv není povoleno!"
+                    )
+
+                    # Pak pošleme původní číslo jako zprávu od uživatele
+                    await webhook.send(
+                        content=str(count),
+                        username=author_name,
+                        avatar_url=avatar_url
+                    )
+                else:
+                    # Fallback na normální zprávu, pokud webhook není dostupný
+                    bot_message = await before.channel.send(
+                        f"**{author_name}** upravil zprávu s číslem **{count}**. "
+                        f"Upravování zpráv není povoleno! Zde je původní číslo: **{count}**"
+                    )
+                    await bot_message.add_reaction("✅")
 
             except discord.Forbidden:
                 print("Bot doesn't have permission to delete messages")
@@ -230,16 +268,36 @@ class Counting(commands.Cog):
             cached_message = self.message_cache[message.id]
             count = cached_message["count"]
             author_name = cached_message["author_name"]
+            author_id = cached_message["author_id"]
 
             try:
-                # Poslání nové zprávy s původním číslem
-                bot_message = await message.channel.send(
-                    f"**{author_name}** smazal zprávu s číslem **{count}**. "
-                    f"Mazání zpráv není povoleno! Zde je původní číslo: **{count}**"
-                )
+                # Získání objektu uživatele pro avatar
+                user = self.bot.get_user(author_id)
+                avatar_url = user.display_avatar.url if user else None
 
-                # Přidání reakce na novou zprávu
-                await bot_message.add_reaction("✅")
+                # Získání nebo vytvoření webhooků
+                webhook = await self.get_or_create_webhook(message.channel)
+
+                if webhook:
+                    # Nejprve pošleme informační zprávu o tom, že došlo ke smazání
+                    await message.channel.send(
+                        f"**{author_name}** smazal zprávu s číslem **{count}**. "
+                        f"Mazání zpráv není povoleno!"
+                    )
+
+                    # Pak pošleme původní číslo jako zprávu od uživatele
+                    await webhook.send(
+                        content=str(count),
+                        username=author_name,
+                        avatar_url=avatar_url
+                    )
+                else:
+                    # Fallback na normální zprávu, pokud webhook není dostupný
+                    bot_message = await message.channel.send(
+                        f"**{author_name}** smazal zprávu s číslem **{count}**. "
+                        f"Mazání zpráv není povoleno! Zde je původní číslo: **{count}**"
+                    )
+                    await bot_message.add_reaction("✅")
 
             except Exception as e:
                 print(f"Error handling deleted message: {e}")
