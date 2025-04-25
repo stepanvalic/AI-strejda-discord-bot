@@ -55,12 +55,13 @@ source venv/bin/activate.fish && python bot.py
 
 ## Konfigurace
 
-Konfigurace bota je uložena v souboru `config.py`. API klíče a tokeny jsou uloženy v souboru `.env`.
+Konfigurace bota je uložena v souboru `config.json` v přehledném formátu. API klíče a tokeny jsou uloženy v souboru `.env`.
 
 ## Struktura projektu
 
 - `bot.py` - Hlavní soubor bota
-- `config.py` - Konfigurační soubor
+- `config.json` - Konfigurační soubor v JSON formátu
+- `config_loader.py` - Modul pro načítání konfigurace
 - `cogs/` - Moduly s funkcionalitou bota
 - `utils/` - Pomocné utility
 - `db/` - Databázové soubory (JSON)
