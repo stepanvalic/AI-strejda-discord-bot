@@ -1,36 +1,43 @@
 import importlib
+import json
 import discord
 from discord.ext import commands
-import config
+import config_loader
 
 # Get channel IDs from config
-YOUTUBE_NOTIFICATION_CHANNEL_ID = config.YOUTUBE_NOTIFICATION_CHANNEL_ID
-COUNTING_CHANNEL_ID = config.COUNTING_CHANNEL_ID
-WELCOME_CHANNEL_ID = config.WELCOME_CHANNEL_ID
-SUMMARY_CHANNEL_ID = config.SUMMARY_CHANNEL_ID
+YOUTUBE_NOTIFICATION_CHANNEL_ID = config_loader.get_youtube_notification_channel_id()
+COUNTING_CHANNEL_ID = config_loader.get_counting_channel_id()
+WELCOME_CHANNEL_ID = config_loader.get_welcome_channel_id()
+SUMMARY_CHANNEL_ID = config_loader.get_summary_channel_id()
 
-def update_config_value(key, value):
-    """Aktualizuje hodnotu v config.py a znovu načte modul"""
-    # Otevřeme config.py soubor
-    with open('config.py', 'r', encoding='utf-8') as file:
-        lines = file.readlines()
+def update_config_value(key_path, value):
+    """Updates a value in config.json using a dot-notation path
 
-    # Najdeme řádek s danou proměnnou
-    for i, line in enumerate(lines):
-        if line.startswith(f"{key} = "):
-            # Aktualizujeme hodnotu podle typu
-            if isinstance(value, str):
-                lines[i] = f'{key} = "{value}"\n'
-            else:
-                lines[i] = f'{key} = {value}\n'
-            break
+    Example: update_config_value("discord.welcome_channel_id", 123456789)
+    """
+    # Load the current config
+    with open('config.json', 'r', encoding='utf-8') as file:
+        config = json.load(file)
 
-    # Zapíšeme změny zpět do souboru
-    with open('config.py', 'w', encoding='utf-8') as file:
-        file.writelines(lines)
+    # Parse the key path
+    keys = key_path.split('.')
 
-    # Znovu načteme modul config
-    importlib.reload(config)
+    # Navigate to the nested location
+    current = config
+    for i, k in enumerate(keys[:-1]):
+        if k not in current:
+            current[k] = {}
+        current = current[k]
+
+    # Update the value
+    current[keys[-1]] = value
+
+    # Write the updated config back to the file
+    with open('config.json', 'w', encoding='utf-8') as file:
+        json.dump(config, file, indent=2)
+
+    # Reload the config_loader module to reflect changes
+    importlib.reload(config_loader)
 
 class Setup(commands.Cog):
     def __init__(self, bot):
@@ -56,7 +63,7 @@ class Setup(commands.Cog):
                 topic="YouTube oznámení o nových videích"
             )
 
-            update_config_value("YOUTUBE_NOTIFICATION_CHANNEL_ID", channel.id)
+            update_config_value("youtube.notification_channel_id", channel.id)
 
             embed = discord.Embed(
                 title="✅ YouTube kanál vytvořen",
@@ -87,7 +94,7 @@ class Setup(commands.Cog):
                 topic="Počítejte od 1 do nekonečna. Další číslo: 1"
             )
 
-            update_config_value("COUNTING_CHANNEL_ID", channel.id)
+            update_config_value("counting_game.channel_id", channel.id)
 
             embed = discord.Embed(
                 title="✅ Counting kanál vytvořen",
@@ -126,7 +133,7 @@ class Setup(commands.Cog):
                 topic="Denní shrnutí Discord chatu"
             )
 
-            update_config_value("SUMMARY_CHANNEL_ID", channel.id)
+            update_config_value("chat_summary.channel_id", channel.id)
 
             embed = discord.Embed(
                 title="✅ Kanál pro shrnutí vytvořen",
@@ -191,7 +198,7 @@ class Setup(commands.Cog):
             )
 
             # Aktualizujeme config soubor
-            update_config_value("AUDIT_LOG_CHANNEL_ID", channel.id)
+            update_config_value("audit_log.channel_id", channel.id)
 
             await ctx.send(f"Vytvořen nový kanál pro audit log: {channel.mention}", ephemeral=True)
 
