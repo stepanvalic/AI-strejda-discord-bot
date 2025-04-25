@@ -227,15 +227,9 @@ class Counting(commands.Cog):
                 webhook = await self.get_or_create_webhook(before.channel)
 
                 if webhook:
-                    # Nejprve pošleme informační zprávu o tom, že došlo k úpravě
-                    await before.channel.send(
-                        f"**{author_name}** upravil zprávu s číslem **{count}**. "
-                        f"Upravování zpráv není povoleno!"
-                    )
-
-                    # Pak pošleme původní číslo jako zprávu od uživatele
+                    # Pošleme jednu zprávu přes webhook s vysvětlením a číslem
                     await webhook.send(
-                        content=str(count),
+                        content=f"**{author_name}** upravil zprávu s číslem **{count}**. Upravování zpráv není povoleno!\n\n>>> **{count}**",
                         username=author_name,
                         avatar_url=avatar_url
                     )
@@ -279,15 +273,9 @@ class Counting(commands.Cog):
                 webhook = await self.get_or_create_webhook(message.channel)
 
                 if webhook:
-                    # Nejprve pošleme informační zprávu o tom, že došlo ke smazání
-                    await message.channel.send(
-                        f"**{author_name}** smazal zprávu s číslem **{count}**. "
-                        f"Mazání zpráv není povoleno!"
-                    )
-
-                    # Pak pošleme původní číslo jako zprávu od uživatele
+                    # Pošleme jednu zprávu přes webhook s vysvětlením a číslem
                     await webhook.send(
-                        content=str(count),
+                        content=f"**{author_name}** smazal zprávu s číslem **{count}**. Mazání zpráv není povoleno!\n\n>>> **{count}**",
                         username=author_name,
                         avatar_url=avatar_url
                     )
