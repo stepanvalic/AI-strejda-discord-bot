@@ -330,36 +330,75 @@ class ChatSummary(commands.Cog):
 
             await target_channel.send(embed=embed)
 
-    @commands.command(name="sumarizace-stepan")
+    @commands.command(name="sumarizace-souhrn")
     @commands.has_permissions(administrator=True)
-    async def manual_summary(self, ctx, channel: discord.TextChannel = None):
-        """Manually trigger a summary generation (admin only)
+    async def daily_summary_command(self, ctx, date_str: str = None, channel: discord.TextChannel = None):
+        """Vygeneruje shrnutí chatu za celý den z databáze
 
         Parameters:
         -----------
+        date_str: Datum ve formátu DD/MM/RRRR (výchozí: včerejší datum)
         channel: Volitelný kanál, kam poslat shrnutí
         """
         await ctx.send("Generuji shrnutí chatu...", ephemeral=True)
 
-        # Get yesterday's date
-        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        # Get the date
+        if date_str:
+            # Convert from DD/MM/YYYY to YYYY-MM-DD
+            date = chat_db.convert_date_format(date_str)
+            if not date:
+                await ctx.send("Neplatný formát data. Použijte formát DD/MM/RRRR (např. 01/05/2024).", ephemeral=True)
+                return
+        else:
+            # Default to yesterday
+            date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
-        # Get messages from yesterday
+        # Get messages for the specified date
         try:
-            messages = chat_db.get_messages_by_date(yesterday)
-            print(f"[Summary] Manual summary: Found {len(messages)} messages for {yesterday}")
+            messages = chat_db.get_messages_by_date(date)
+            print(f"[Summary] Daily summary command: Found {len(messages)} messages for {date}")
         except Exception as e:
             print(f"[Summary] Error getting messages by date: {e}")
             await ctx.send(f"Chyba při získávání zpráv: {e}", ephemeral=True)
             return
 
         if not messages:
-            print(f"[Summary] Manual summary: No messages found for {yesterday}")
-            await ctx.send(f"Žádné zprávy pro {yesterday} nebyly nalezeny.", ephemeral=True)
+            print(f"[Summary] Daily summary command: No messages found for {date}")
+            await ctx.send(f"Žádné zprávy pro {date} nebyly nalezeny.", ephemeral=True)
             return
 
+        # Check if we already have a summary for this date
+        existing_summary = chat_db.get_summary_by_date(date)
+        if existing_summary:
+            # Ask if the user wants to regenerate
+            await ctx.send(
+                f"Pro datum {date} již existuje shrnutí. Chcete ho přegenerovat? (ano/ne)",
+                ephemeral=True
+            )
+
+            # Wait for response
+            try:
+                def check(m):
+                    return m.author == ctx.author and m.channel == ctx.channel and m.content.lower() in ["ano", "ne"]
+
+                response = await self.bot.wait_for("message", check=check, timeout=30.0)
+
+                if response.content.lower() == "ne":
+                    await ctx.send("Operace zrušena.", ephemeral=True)
+                    return
+
+                # Delete the response message if possible
+                try:
+                    await response.delete()
+                except:
+                    pass
+
+            except asyncio.TimeoutError:
+                await ctx.send("Čas na odpověď vypršel. Operace zrušena.", ephemeral=True)
+                return
+
         # Generate summary
-        summary = await self.generate_summary(messages, yesterday)
+        summary = await self.generate_summary(messages, date)
 
         if not summary:
             await ctx.send("Nepodařilo se vygenerovat shrnutí.", ephemeral=True)
@@ -371,7 +410,7 @@ class ChatSummary(commands.Cog):
 
         # Save summary to database with message IDs for topics
         summary_data = {
-            "date": yesterday,
+            "date": date,
             "message_count": len(messages),
             "summary": summary,
             "timestamp": datetime.now().isoformat(),
@@ -386,11 +425,14 @@ class ChatSummary(commands.Cog):
         # Send summary to channel
         await self.send_summary(summary_data, target_channel_id)
 
+        # Format date for display (YYYY-MM-DD to DD/MM/YYYY)
+        display_date = f"{date[8:10]}/{date[5:7]}/{date[0:4]}"
+
         # Prepare confirmation message
         if channel:
-            await ctx.send(f"Shrnutí pro {yesterday} bylo vygenerováno a odesláno do kanálu {channel.mention}.", ephemeral=True)
+            await ctx.send(f"Shrnutí pro {display_date} bylo vygenerováno a odesláno do kanálu {channel.mention}.", ephemeral=True)
         else:
-            await ctx.send(f"Shrnutí pro {yesterday} bylo vygenerováno a odesláno do výchozího kanálu.", ephemeral=True)
+            await ctx.send(f"Shrnutí pro {display_date} bylo vygenerováno a odesláno do výchozího kanálu.", ephemeral=True)
 
     @commands.command(name="sumarizace")
     @commands.cooldown(1, SUMMARY_COOLDOWN_HOURS*60*60, BucketType.user)  # 1 use per X hours per user

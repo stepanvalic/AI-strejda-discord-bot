@@ -198,3 +198,14 @@ def clean_old_messages(days_to_keep=30):
     _save_db(db)
 
     return len(db["messages"])
+
+def convert_date_format(date_str):
+    """Convert date from DD/MM/YYYY to YYYY-MM-DD format"""
+    try:
+        # Parse the input date string
+        day, month, year = date_str.split('/')
+        # Format as YYYY-MM-DD
+        return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+    except (ValueError, AttributeError) as e:
+        print(f"[Summary] Error converting date format: {e}")
+        return None
