@@ -409,25 +409,32 @@ class Utility(commands.Cog):
             inline=False
         )
 
+        # Načtení hodnot z konfigurace
+        from cogs.ai_moderation import AI_MESSAGES_BATCH, AI_MODEL, AI_MODERATION_INTERVAL_MINUTES
+        from cogs.ai_moderation import AI_POSITIVE_THRESHOLD_1, AI_POSITIVE_THRESHOLD_2, AI_POSITIVE_THRESHOLD_3
+        from cogs.ai_moderation import AI_NEGATIVE_THRESHOLD, AI_VERY_NEGATIVE_THRESHOLD, AI_NEGATIVE_PENALTY
+
         rules_embed.add_field(
             name="💬 Analýza zpráv",
-            value="AI analyzuje vaše zprávy a hodnotí jejich sentiment (pozitivní nebo negativní). Za pozitivní komunikaci získáváte body, za negativní je ztrácíte.",
+            value=f"AI analyzuje **{AI_MESSAGES_BATCH}** zpráv od každého uživatele najednou pomocí modelu **{AI_MODEL}**.\n"
+                  f"Kontrola probíhá každých **{AI_MODERATION_INTERVAL_MINUTES}** minut.\n"
+                  f"Za pozitivní komunikaci získáváte body, za negativní je ztrácíte.",
             inline=False
         )
 
         rules_embed.add_field(
             name="🌟 Odměny za pozitivní chování",
-            value="**Úroveň 1:** 800+ bodů - získáte speciální roli\n"
-                  "**Úroveň 2:** 2000+ bodů - získáte pokročilejší roli\n"
-                  "**Úroveň 3:** 5000+ bodů - získáte nejvyšší roli",
+            value=f"**Úroveň 1:** {AI_POSITIVE_THRESHOLD_1}+ bodů - získáte speciální roli\n"
+                  f"**Úroveň 2:** {AI_POSITIVE_THRESHOLD_2}+ bodů - získáte pokročilejší roli\n"
+                  f"**Úroveň 3:** {AI_POSITIVE_THRESHOLD_3}+ bodů - získáte nejvyšší roli",
             inline=False
         )
 
         rules_embed.add_field(
             name="⚠️ Postihy za negativní chování",
-            value="**Timeout:** -30 bodů - dočasný timeout\n"
-                  "**Negativní role:** -1000 bodů - přidělení negativní role\n"
-                  "**Extra postih:** -50 bodů za každou velmi negativní zprávu",
+            value=f"**Upozornění moderátorům:** {AI_NEGATIVE_THRESHOLD} bodů\n"
+                  f"**Negativní role:** {AI_VERY_NEGATIVE_THRESHOLD} bodů - přidělení negativní role\n"
+                  f"**Extra postih:** {AI_NEGATIVE_PENALTY} bodů za každou velmi negativní zprávu",
             inline=False
         )
 
