@@ -97,7 +97,7 @@ class ChatSummary(commands.Cog):
 
         # Extract message IDs from the summary for topic beginnings
         import re
-        topic_links = re.findall(r'<https://discord\.com/channels/\d+/\d+/(\d+)>', summary)
+        topic_links = re.findall(r'\[téma\]\(https://discord\.com/channels/\d+/\d+/(\d+)\)', summary)
 
         # Save summary to database with message IDs for topics
         summary_data = {
@@ -178,7 +178,7 @@ class ChatSummary(commands.Cog):
             "## Téma 2 [TOPIC_START:12]\n"
             "Shrnutí tématu 2...\n\n"
             "Kde čísla 5 a 12 jsou indexy zpráv, které začínají dané téma. "
-            "Tyto indexy budou později nahrazeny odkazy na konkrétní zprávy, což umožní uživatelům "
+            "Tyto indexy budou později nahrazeny odkazy na konkrétní zprávy ve formátu [téma](url), což umožní uživatelům "
             "přejít přímo na začátek daného tématu v historii chatu. Je důležité, aby každé téma "
             "mělo označení [TOPIC_START:index] hned za jeho názvem."
         )
@@ -189,7 +189,8 @@ class ChatSummary(commands.Cog):
             f"body diskuze. Pro každé téma identifikuj první zprávu, která toto téma začíná, a označ ji jako 'TOPIC_START:index'. "
             f"Formát by měl být: '## Název tématu [TOPIC_START:index]'. "
             f"Pokud se v textu vyskytují odkazy, zahrň je do shrnutí. "
-            f"Nezapomeň, že každé téma musí mít označení [TOPIC_START:index], aby uživatelé mohli kliknout na odkaz a přejít na začátek tématu.\n\n"
+            f"Nezapomeň, že každé téma musí mít označení [TOPIC_START:index], aby uživatelé mohli kliknout na odkaz a přejít na začátek tématu. "
+            f"Tyto indexy budou později nahrazeny odkazy ve formátu [téma](url).\n\n"
             f"{all_messages}"
         )
 
@@ -237,8 +238,9 @@ class ChatSummary(commands.Cog):
                             msg_info = message_map[index]
                             message_id = msg_info["message_id"]
                             channel_id = msg_info["channel_id"]
-                            # Format for clickable message link in Discord
-                            return f"<https://discord.com/channels/{config.get_int('GUILD_ID')}/{channel_id}/{message_id}>"
+                            # Format for clickable message link in Discord using [tema](url) format
+                            url = f"https://discord.com/channels/{config.get_int('GUILD_ID')}/{channel_id}/{message_id}"
+                            return f"[téma]({url})"
                         return ""
 
                     processed_summary = re.sub(topic_start_pattern, replace_topic_start, summary)
@@ -406,7 +408,7 @@ class ChatSummary(commands.Cog):
 
         # Extract message IDs from the summary for topic beginnings
         import re
-        topic_links = re.findall(r'<https://discord\.com/channels/\d+/\d+/(\d+)>', summary)
+        topic_links = re.findall(r'\[téma\]\(https://discord\.com/channels/\d+/\d+/(\d+)\)', summary)
 
         # Save summary to database with message IDs for topics
         summary_data = {
@@ -479,7 +481,7 @@ class ChatSummary(commands.Cog):
 
             # Extract message IDs from the summary for topic beginnings
             import re
-            topic_links = re.findall(r'<https://discord\.com/channels/\d+/\d+/(\d+)>', summary)
+            topic_links = re.findall(r'\[téma\]\(https://discord\.com/channels/\d+/\d+/(\d+)\)', summary)
 
             # Create summary data
             summary_data = {
