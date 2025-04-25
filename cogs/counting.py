@@ -13,6 +13,7 @@ class Counting(commands.Cog):
         self.bot = bot
         self.data = self.load_data()
         self.message_cache = {}  # Cache pro sledování zpráv v kanálu počítání
+        self.last_notification_message = None  # Poslední zpráva odeslaná botem při úpravě/smazání
 
     def load_data(self):
         os.makedirs(os.path.dirname(COUNTING_SAVE_FILE), exist_ok=True)
@@ -208,8 +209,8 @@ class Counting(commands.Cog):
         if before.content == after.content:
             return
 
-        # Kontrola, zda je zpráva v cache
-        if before.id in self.message_cache:
+        # Kontrola, zda je zpráva v cache a zda je to poslední platné číslo
+        if before.id in self.message_cache and self.message_cache[before.id]["count"] == self.data["current_count"]:
             cached_message = self.message_cache[before.id]
             count = cached_message["count"]
             author_name = cached_message["author_name"]
@@ -227,19 +228,34 @@ class Counting(commands.Cog):
                 webhook = await self.get_or_create_webhook(before.channel)
 
                 if webhook:
+                    # Pokud existuje předchozí zpráva, smažeme ji
+                    if self.last_notification_message:
+                        try:
+                            await self.last_notification_message.delete()
+                        except:
+                            pass  # Ignorujeme chyby při mazání (zpráva už mohla být smazána)
+
                     # Pošleme jednu zprávu přes webhook s vysvětlením a číslem
-                    await webhook.send(
+                    self.last_notification_message = await webhook.send(
                         content=f"**{author_name}** upravil zprávu s číslem **{count}**. Upravování zpráv není povoleno!\n\n>>> **{count}**",
                         username=author_name,
                         avatar_url=avatar_url
                     )
                 else:
                     # Fallback na normální zprávu, pokud webhook není dostupný
-                    bot_message = await before.channel.send(
+                    # Pokud existuje předchozí zpráva, smažeme ji
+                    if self.last_notification_message:
+                        try:
+                            await self.last_notification_message.delete()
+                        except:
+                            pass  # Ignorujeme chyby při mazání (zpráva už mohla být smazána)
+
+                    # Pošleme novou zprávu
+                    self.last_notification_message = await before.channel.send(
                         f"**{author_name}** upravil zprávu s číslem **{count}**. "
                         f"Upravování zpráv není povoleno! Zde je původní číslo: **{count}**"
                     )
-                    await bot_message.add_reaction("✅")
+                    await self.last_notification_message.add_reaction("✅")
 
             except discord.Forbidden:
                 print("Bot doesn't have permission to delete messages")
@@ -273,19 +289,34 @@ class Counting(commands.Cog):
                 webhook = await self.get_or_create_webhook(message.channel)
 
                 if webhook:
+                    # Pokud existuje předchozí zpráva, smažeme ji
+                    if self.last_notification_message:
+                        try:
+                            await self.last_notification_message.delete()
+                        except:
+                            pass  # Ignorujeme chyby při mazání (zpráva už mohla být smazána)
+
                     # Pošleme jednu zprávu přes webhook s vysvětlením a číslem
-                    await webhook.send(
+                    self.last_notification_message = await webhook.send(
                         content=f"**{author_name}** smazal zprávu s číslem **{count}**. Mazání zpráv není povoleno!\n\n>>> **{count}**",
                         username=author_name,
                         avatar_url=avatar_url
                     )
                 else:
                     # Fallback na normální zprávu, pokud webhook není dostupný
-                    bot_message = await message.channel.send(
+                    # Pokud existuje předchozí zpráva, smažeme ji
+                    if self.last_notification_message:
+                        try:
+                            await self.last_notification_message.delete()
+                        except:
+                            pass  # Ignorujeme chyby při mazání (zpráva už mohla být smazána)
+
+                    # Pošleme novou zprávu
+                    self.last_notification_message = await message.channel.send(
                         f"**{author_name}** smazal zprávu s číslem **{count}**. "
                         f"Mazání zpráv není povoleno! Zde je původní číslo: **{count}**"
                     )
-                    await bot_message.add_reaction("✅")
+                    await self.last_notification_message.add_reaction("✅")
 
             except Exception as e:
                 print(f"Error handling deleted message: {e}")
