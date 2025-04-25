@@ -87,6 +87,20 @@ def get_messages_for_day(day_offset=0):
     target_date = (datetime.now() - timedelta(days=day_offset)).strftime("%Y-%m-%d")
     return get_messages_by_date(target_date)
 
+def get_latest_messages(count=100):
+    """Get the latest N messages from the database"""
+    db = _load_db()
+
+    # Sort messages by timestamp (newest first)
+    sorted_messages = sorted(
+        db["messages"],
+        key=lambda x: x.get("timestamp", ""),
+        reverse=True
+    )
+
+    # Return only the requested number of messages
+    return sorted_messages[:count]
+
 def get_summary_path(date):
     """Get the file path for a summary by date"""
     return os.path.join(SUMMARY_DIR, f"{date}.json")

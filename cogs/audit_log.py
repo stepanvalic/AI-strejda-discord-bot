@@ -1,15 +1,14 @@
 import discord
 from discord.ext import commands
+import os
 import datetime
 import asyncio
-import importlib
-import json
-import config_loader
+from utils import config
 
-# Get configuration from config_loader
-AUDIT_LOG_CHANNEL_ID = config_loader.get_audit_log_channel_id()
-GUILD_ID = config_loader.get_guild_id()
-COUNTING_CHANNEL_ID = config_loader.get_counting_channel_id()
+# Načtení proměnných z konfigurace
+AUDIT_LOG_CHANNEL_ID = config.get_int('AUDIT_LOG_CHANNEL_ID')
+GUILD_ID = config.get_int('GUILD_ID')
+COUNTING_CHANNEL_ID = config.get_int('COUNTING_CHANNEL_ID')
 
 class AuditLog(commands.Cog):
     def __init__(self, bot):
@@ -28,7 +27,7 @@ class AuditLog(commands.Cog):
             else:
                 print(f"Varování: Audit log kanál s ID {AUDIT_LOG_CHANNEL_ID} nebyl nalezen!")
         else:
-            print("Audit log kanál není nastaven v konfiguračním souboru (AUDIT_LOG_CHANNEL_ID)")
+            print("Audit log kanál není nastaven v .env souboru (AUDIT_LOG_CHANNEL_ID)")
 
     async def send_log(self, embed):
         """Odešle audit log do určeného kanálu"""
@@ -488,8 +487,8 @@ class AuditLog(commands.Cog):
                 await ctx.send(f"Nastala chyba při vytváření kanálu: {e}", ephemeral=True)
                 return
 
-        # Aktualizujeme konfigurační soubor
-        self.update_config_value('AUDIT_LOG_CHANNEL_ID', channel.id)
+        # Aktualizujeme .env soubor
+        self.update_env_file('AUDIT_LOG_CHANNEL_ID', str(channel.id))
 
         # Aktualizujeme proměnnou v paměti
         global AUDIT_LOG_CHANNEL_ID
@@ -507,45 +506,62 @@ class AuditLog(commands.Cog):
 
         await ctx.send(f"Kanál {channel.mention} byl nastaven jako audit log.", ephemeral=True)
 
-    def update_config_value(self, key, value):
-        """Updates a value in config.json using a dot-notation path"""
-        # Map old config keys to new dot-notation paths
-        key_mapping = {
-            'AUDIT_LOG_CHANNEL_ID': 'audit_log.channel_id',
-            'COUNTING_CHANNEL_ID': 'counting_game.channel_id',
-            'WELCOME_CHANNEL_ID': 'discord.welcome_channel_id',
-            'SUMMARY_CHANNEL_ID': 'chat_summary.channel_id',
-            'YOUTUBE_NOTIFICATION_CHANNEL_ID': 'youtube.notification_channel_id'
-        }
+    def update_env_file(self, key, value):
+        """Aktualizuje hodnotu v konfiguraci"""
+        # Check if this is a sensitive key that should be in .env
+        sensitive_keys = ['DISCORD_TOKEN', 'YOUTUBE_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY']
 
-        # Convert old key to new path
-        key_path = key_mapping.get(key, key)
+        if key in sensitive_keys:
+            # Update .env file for sensitive keys
+            env_path = '.env'
+            try:
+                with open(env_path, 'r') as file:
+                    lines = file.readlines()
 
-        # Load the current config
-        with open('config.json', 'r', encoding='utf-8') as file:
-            config = json.load(file)
+                # Hledáme řádek s daným klíčem
+                key_exists = False
+                for i, line in enumerate(lines):
+                    if line.startswith(f"{key}=") or line.startswith(f"# {key}="):
+                        lines[i] = f"{key}={value}\n"
+                        key_exists = True
+                        break
 
-        # Parse the key path
-        keys = key_path.split('.')
+                # Pokud klíč neexistuje, přidáme ho na konec souboru
+                if not key_exists:
+                    lines.append(f"{key}={value}\n")
 
-        # Navigate to the nested location
-        current = config
-        for i, k in enumerate(keys[:-1]):
-            if k not in current:
-                current[k] = {}
-            current = current[k]
+                # Zapíšeme změny zpět do souboru
+                with open(env_path, 'w') as file:
+                    file.writelines(lines)
 
-        # Update the value
-        current[keys[-1]] = value
+                print(f"Hodnota {key} byla aktualizována v .env souboru")
+            except Exception as e:
+                print(f"Chyba při aktualizaci .env souboru: {e}")
+        else:
+            # Update config.json for non-sensitive keys
+            try:
+                import json
+                config_path = 'config.json'
 
-        # Write the updated config back to the file
-        with open('config.json', 'w', encoding='utf-8') as file:
-            json.dump(config, file, indent=2)
+                try:
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        config_data = json.load(f)
+                except (FileNotFoundError, json.JSONDecodeError):
+                    config_data = {}
 
-        print(f"Value {key_path} was updated in config.json")
+                # Update the value
+                config_data[key] = value
 
-        # Reload the config_loader module to reflect changes
-        importlib.reload(config_loader)
+                # Save back to config.json
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    json.dump(config_data, f, indent=4)
+
+                print(f"Hodnota {key} byla aktualizována v config.json")
+            except Exception as e:
+                print(f"Chyba při aktualizaci config.json: {e}")
+
+        # Update the in-memory configuration
+        config.set(key, value)
 
     def get_channel_type(self, channel):
         """Vrátí typ kanálu v čitelné podobě"""

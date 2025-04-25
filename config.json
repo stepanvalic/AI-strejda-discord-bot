@@ -1,55 +1,42 @@
 {
-  "discord": {
-    "guild_id": 1359910160277045338,
-    "welcome_channel_id": 1360178791942455337
-  },
-  "bot_activity": {
-    "base_text": "",
-    "format_text": "{count} darebáků"
-  },
-  "youtube": {
-    "channel_id": "@davidstrejc",
-    "notification_channel_id": 1360172627141988442,
-    "check_interval_seconds": 3600
-  },
-  "counting_game": {
-    "channel_id": 1362166632482476292,
-    "save_file": "db/counting.json",
-    "topic_prefix": "Počítejte od 1 do nekonečna. Další číslo:"
-  },
-  "ai_moderation": {
-    "model": "gemini-2.0-flash",
-    "messages_batch": 15,
-    "save_file": "db/ai_moderation.json",
-    "interval_minutes": 30,
-    "positive_thresholds": {
-      "level_1": 800,
-      "level_2": 2000,
-      "level_3": 5000
-    },
-    "negative_thresholds": {
-      "negative": -35,
-      "very_negative": -1250
-    },
-    "negative_penalty": -30,
-    "role_ids": {
-      "positive_1": 1362165722955907333,
-      "positive_2": 1362165065368735834,
-      "positive_3": 1362164720215261244,
-      "negative": 1362164949018742805
-    }
-  },
-  "audit_log": {
-    "channel_id": 1362167228358856865
-  },
-  "chat_summary": {
-    "model": "deepseek/deepseek-chat-v3-0324:free",
-    "chat_id": 1359910160277045341,
-    "channel_id": 1362483597226803270
-  },
-  "logger": {
-    "level": "INFO",
-    "max_size": 5242880,
-    "backup_count": 10
-  }
+    "GUILD_ID": 1359910160277045338,
+    "WELCOME_CHANNEL_ID": 1360178791942455337,
+
+    "ACTIVITY_BASE_TEXT": "",
+    "ACTIVITY_FORMAT_TEXT": "{count} darebáků",
+
+    "YOUTUBE_CHANNEL_ID": "@davidstrejc",
+    "YOUTUBE_NOTIFICATION_CHANNEL_ID": 1360172627141988442,
+    "CHECK_INTERVAL_SECONDS": 15,
+
+    "COUNTING_CHANNEL_ID": 1362166632482476292,
+    "COUNTING_SAVE_FILE": "db/counting.json",
+    "COUNTING_TOPIC_PREFIX": "Počítejte od 1 do nekonečna. Další číslo:",
+
+    "AI_MODEL": "gemini-2.0-flash",
+    "AI_MESSAGES_BATCH": 15,
+    "AI_MODERATION_SAVE_FILE": "db/ai_moderation.json",
+    "AI_MODERATION_INTERVAL_MINUTES": 30,
+    "AI_POSITIVE_THRESHOLD_1": 700,
+    "AI_POSITIVE_THRESHOLD_2": 3500,
+    "AI_POSITIVE_THRESHOLD_3": 7000,
+    "AI_NEGATIVE_THRESHOLD": -35,
+    "AI_VERY_NEGATIVE_THRESHOLD": -1250,
+    "AI_NEGATIVE_PENALTY": -30,
+    "AI_POSITIVE_ROLE_ID_1": 1362165722955907333,
+    "AI_POSITIVE_ROLE_ID_2": 1362165065368735834,
+    "AI_POSITIVE_ROLE_ID_3": 1362164720215261244,
+    "AI_NEGATIVE_ROLE_ID": 1362164949018742805,
+    "AI_MODERATION_CHANNEL_IDS": [1359910160277045341, 1360860743209324564, 1362529458833330445, 1364139712734035998, 1365257619530453012, 1360172194591805562],
+
+    "AUDIT_LOG_CHANNEL_ID": 1362167228358856865,
+
+    "OPENROUTER_MODEL": "deepseek/deepseek-chat-v3-0324:free",
+    "SUMMARY_CHAT_ID": 1359910160277045341,
+    "SUMMARY_CHANNEL_ID": 1362483597226803270,
+    "SUMMARY_COOLDOWN_HOURS": 6,
+
+    "LOG_LEVEL": "INFO",
+    "LOG_MAX_SIZE": 5242880,
+    "LOG_BACKUP_COUNT": 10
 }

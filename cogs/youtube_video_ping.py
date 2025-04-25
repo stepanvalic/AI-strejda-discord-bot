@@ -1,22 +1,24 @@
 import discord
 from discord.ext import commands, tasks
+import os
+import json
 import aiohttp
 import datetime
-from utils import db
-import config_loader
+import re
+from utils import db, config
 
-# Get configuration from config_loader
-YOUTUBE_CHANNEL = config_loader.get_youtube_channel_id()
-YOUTUBE_NOTIFICATION_CHANNEL_ID = config_loader.get_youtube_notification_channel_id()
-CHECK_INTERVAL_SECONDS = config_loader.get_youtube_check_interval()
-YOUTUBE_API_KEY = config_loader.get_youtube_api_key()
+YOUTUBE_API_KEY = config.get('YOUTUBE_API_KEY')
+YOUTUBE_CHANNEL = config.get('YOUTUBE_CHANNEL_ID')
 
-# Determine if channel ID is a username
 IS_USERNAME = YOUTUBE_CHANNEL.startswith('@')
 YOUTUBE_USERNAME = YOUTUBE_CHANNEL if IS_USERNAME else None
 YOUTUBE_CHANNEL_ID = None if IS_USERNAME else YOUTUBE_CHANNEL
 
-UPDATE_INTERVAL_SECONDS = 5 * 60
+YOUTUBE_NOTIFICATION_CHANNEL_ID = config.get_int('YOUTUBE_NOTIFICATION_CHANNEL_ID')
+
+CHECK_INTERVAL_SECONDS = config.get_int('CHECK_INTERVAL_SECONDS', 30)
+
+UPDATE_INTERVAL_SECONDS = 30 * 60
 
 class YouTubePing(commands.Cog):
     def __init__(self, bot):

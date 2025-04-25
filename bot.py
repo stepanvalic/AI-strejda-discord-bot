@@ -1,21 +1,19 @@
 import discord
 from discord.ext import commands
 import colorama
-from colorama import Fore, Style
+from colorama import Fore, Back, Style
 from utils.permissions import check_permissions
-import config_loader
+from utils import config
 
 colorama.init(autoreset=True)
 
-# Get configuration from config_loader
-TOKEN = config_loader.get_discord_token()
-GUILD_ID = config_loader.get_guild_id()
+TOKEN = config.get('DISCORD_TOKEN')
+GUILD_ID = config.get_int('GUILD_ID')
 
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 
-# Vypnutí vestavěného help příkazu
 bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
 @bot.event
@@ -34,7 +32,6 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
         return
 
-    # Kontrola oprávnění a poslání soukromé zprávy při nedostatku oprávnění
     if await check_permissions(ctx, error):
         return
 
@@ -88,8 +85,6 @@ async def load_extensions():
 
     await bot.load_extension("cogs.logger")
     print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}logger{Fore.MAGENTA} cog")
-
-
 
 async def main():
     async with bot:

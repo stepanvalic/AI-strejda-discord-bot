@@ -5,20 +5,15 @@ from discord.ext import commands, tasks
 import aiohttp
 import asyncio
 from datetime import datetime, time, timedelta
-from dotenv import load_dotenv
-from utils import chat_db
-import config_loader
+from utils import chat_db, config
+from discord.ext.commands import CommandOnCooldown, BucketType
 
-# Load environment variables for API keys
-load_dotenv()
-
-# Get API key from config_loader
-OPENROUTER_API_KEY = config_loader.get_openrouter_api_key()
-
-# Get configuration from config_loader
-CHAT_ID = config_loader.get_summary_chat_id()
-SUMMARY_CHANNEL_ID = config_loader.get_summary_channel_id()
-OPENROUTER_MODEL = config_loader.get_openrouter_model()
+# Load configuration
+CHAT_ID = config.get_int('SUMMARY_CHAT_ID', 0)
+SUMMARY_CHANNEL_ID = config.get_int('SUMMARY_CHANNEL_ID', 0)
+OPENROUTER_API_KEY = config.get('OPENROUTER_API_KEY', '')
+OPENROUTER_MODEL = config.get('OPENROUTER_MODEL', '')
+SUMMARY_COOLDOWN_HOURS = config.get_int('SUMMARY_COOLDOWN_HOURS', 6)
 
 class ChatSummary(commands.Cog):
     def __init__(self, bot):
@@ -100,12 +95,17 @@ class ChatSummary(commands.Cog):
             print("[Summary] Failed to generate summary")
             return
 
-        # Save summary to database
+        # Extract message IDs from the summary for topic beginnings
+        import re
+        topic_links = re.findall(r'<https://discord\.com/channels/\d+/\d+/(\d+)>', summary)
+
+        # Save summary to database with message IDs for topics
         summary_data = {
             "date": yesterday,
             "message_count": len(messages),
             "summary": summary,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "topic_message_ids": topic_links
         }
 
         chat_db.save_summary(summary_data)
@@ -136,17 +136,30 @@ class ChatSummary(commands.Cog):
 
         # Prepare messages for the API
         message_texts = []
+        message_map = {}  # Map to store message IDs for reference
+
         for msg in messages:
             username = msg.get("display_name") or msg.get("username", "Unknown")
             content = msg.get("content", "")
             timestamp = msg.get("timestamp", "")[:19]  # Truncate to remove microseconds
+            message_id = msg.get("message_id", "")
+            channel_id = msg.get("channel_id", "")
 
             # Skip empty messages
             if not content.strip():
                 continue
 
-            # Format message
-            message_texts.append(f"[{timestamp}] {username}: {content}")
+            # Format message with ID for reference
+            formatted_message = f"[{timestamp}] {username}: {content}"
+            message_texts.append(formatted_message)
+
+            # Store message ID with its index for later reference
+            message_map[len(message_texts) - 1] = {
+                "message_id": message_id,
+                "channel_id": channel_id,
+                "timestamp": timestamp,
+                "username": username
+            }
 
         # Join messages with newlines
         all_messages = "\n".join(message_texts)
@@ -156,13 +169,27 @@ class ChatSummary(commands.Cog):
             "Jsi asistent, který vytváří denní shrnutí diskuzí z Discord chatu. "
             "Tvým úkolem je analyzovat zprávy a vytvořit strukturované shrnutí hlavních témat, "
             "která se v chatu probírala. Shrnutí by mělo být v češtině a mělo by být rozděleno "
-            "podle témat. Zahrň odkazy na zprávy, které jsou v textu (začínají http:// nebo https://)."
+            "podle témat. Pro každé téma identifikuj první zprávu, která toto téma začíná, a označ ji jako 'TOPIC_START:index', "
+            "kde index je pořadové číslo zprávy v seznamu (začíná od 0). "
+            "Zahrň odkazy na zprávy, které jsou v textu (začínají http:// nebo https://). "
+            "Formát výstupu by měl být následující:\n\n"
+            "## Téma 1 [TOPIC_START:5]\n"
+            "Shrnutí tématu 1...\n\n"
+            "## Téma 2 [TOPIC_START:12]\n"
+            "Shrnutí tématu 2...\n\n"
+            "Kde čísla 5 a 12 jsou indexy zpráv, které začínají dané téma. "
+            "Tyto indexy budou později nahrazeny odkazy na konkrétní zprávy, což umožní uživatelům "
+            "přejít přímo na začátek daného tématu v historii chatu. Je důležité, aby každé téma "
+            "mělo označení [TOPIC_START:index] hned za jeho názvem."
         )
 
         user_prompt = (
             f"Zde jsou zprávy z Discord chatu ze dne {date}. Vytvoř strukturované shrnutí "
             f"hlavních témat, která se probírala. Rozděl shrnutí podle témat a zahrň důležité "
-            f"body diskuze. Pokud se v textu vyskytují odkazy, zahrň je do shrnutí.\n\n"
+            f"body diskuze. Pro každé téma identifikuj první zprávu, která toto téma začíná, a označ ji jako 'TOPIC_START:index'. "
+            f"Formát by měl být: '## Název tématu [TOPIC_START:index]'. "
+            f"Pokud se v textu vyskytují odkazy, zahrň je do shrnutí. "
+            f"Nezapomeň, že každé téma musí mít označení [TOPIC_START:index], aby uživatelé mohli kliknout na odkaz a přejít na začátek tématu.\n\n"
             f"{all_messages}"
         )
 
@@ -199,7 +226,23 @@ class ChatSummary(commands.Cog):
                         return None
 
                     summary = data["choices"][0]["message"]["content"]
-                    return summary
+
+                    # Process the summary to replace TOPIC_START markers with actual message links
+                    import re
+                    topic_start_pattern = r'\[TOPIC_START:(\d+)\]'
+
+                    def replace_topic_start(match):
+                        index = int(match.group(1))
+                        if index in message_map:
+                            msg_info = message_map[index]
+                            message_id = msg_info["message_id"]
+                            channel_id = msg_info["channel_id"]
+                            # Format for clickable message link in Discord
+                            return f"<https://discord.com/channels/{config.get_int('GUILD_ID')}/{channel_id}/{message_id}>"
+                        return ""
+
+                    processed_summary = re.sub(topic_start_pattern, replace_topic_start, summary)
+                    return processed_summary
 
         except Exception as e:
             print(f"[Summary] Error calling OpenRouter API: {e}")
@@ -322,12 +365,17 @@ class ChatSummary(commands.Cog):
             await ctx.send("Nepodařilo se vygenerovat shrnutí.", ephemeral=True)
             return
 
-        # Save summary to database
+        # Extract message IDs from the summary for topic beginnings
+        import re
+        topic_links = re.findall(r'<https://discord\.com/channels/\d+/\d+/(\d+)>', summary)
+
+        # Save summary to database with message IDs for topics
         summary_data = {
             "date": yesterday,
             "message_count": len(messages),
             "summary": summary,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "topic_message_ids": topic_links
         }
 
         chat_db.save_summary(summary_data)
@@ -343,6 +391,173 @@ class ChatSummary(commands.Cog):
             await ctx.send(f"Shrnutí pro {yesterday} bylo vygenerováno a odesláno do kanálu {channel.mention}.", ephemeral=True)
         else:
             await ctx.send(f"Shrnutí pro {yesterday} bylo vygenerováno a odesláno do výchozího kanálu.", ephemeral=True)
+
+    @commands.command(name="sumarizace")
+    @commands.cooldown(1, SUMMARY_COOLDOWN_HOURS*60*60, BucketType.user)  # 1 use per X hours per user
+    async def user_summary(self, ctx, count: int = 100):
+        """Vygeneruje shrnutí posledních N zpráv a pošle ho do soukromé zprávy
+
+        Parameters:
+        -----------
+        count: Počet zpráv k sumarizaci (výchozí: 100, maximum: 500)
+        """
+        # Check if count is within reasonable limits
+        if count > 500:
+            await ctx.send("Maximální počet zpráv pro sumarizaci je 500.", ephemeral=True)
+            ctx.command.reset_cooldown(ctx)
+            return
+
+        if count < 10:
+            await ctx.send("Minimální počet zpráv pro sumarizaci je 10.", ephemeral=True)
+            ctx.command.reset_cooldown(ctx)
+            return
+
+        # Admin bypass for cooldown
+        if ctx.author.guild_permissions.administrator:
+            ctx.command.reset_cooldown(ctx)
+
+        await ctx.send(f"Generuji shrnutí posledních {count} zpráv. Výsledek ti pošlu do soukromé zprávy.", ephemeral=True)
+
+        try:
+            # Get the latest messages
+            messages = chat_db.get_latest_messages(count)
+            print(f"[Summary] User summary: Found {len(messages)} messages for user {ctx.author.display_name}")
+
+            if not messages:
+                await ctx.send("Nenalezeny žádné zprávy k sumarizaci.", ephemeral=True)
+                return
+
+            # Generate summary
+            current_date = datetime.now().strftime("%Y-%m-%d")
+            summary = await self.generate_summary(messages, current_date)
+
+            if not summary:
+                await ctx.send("Nepodařilo se vygenerovat shrnutí.", ephemeral=True)
+                return
+
+            # Extract message IDs from the summary for topic beginnings
+            import re
+            topic_links = re.findall(r'<https://discord\.com/channels/\d+/\d+/(\d+)>', summary)
+
+            # Create summary data
+            summary_data = {
+                "date": current_date,
+                "message_count": len(messages),
+                "summary": summary,
+                "timestamp": datetime.now().isoformat(),
+                "topic_message_ids": topic_links,
+                "requested_by": str(ctx.author.id)
+            }
+
+            # Send summary to user via DM
+            await self.send_summary_dm(ctx.author, summary_data)
+
+            # Confirm to the user
+            await ctx.send("Shrnutí bylo vygenerováno a posláno do tvých soukromých zpráv.", ephemeral=True)
+
+        except Exception as e:
+            print(f"[Summary] Error generating user summary: {e}")
+            await ctx.send(f"Chyba při generování shrnutí: {e}", ephemeral=True)
+            # Don't reset cooldown on error to prevent abuse
+
+    async def send_summary_dm(self, user, summary_data):
+        """Send the summary to a user via DM"""
+        # Create embed
+        message_count = summary_data.get("message_count", 0)
+        summary = summary_data.get("summary", "No summary available")
+
+        # Split summary into chunks if it's too long
+        max_embed_description_length = 4096
+        summary_chunks = []
+
+        if len(summary) <= max_embed_description_length:
+            summary_chunks = [summary]
+        else:
+            # Split by paragraphs first
+            paragraphs = summary.split("\n\n")
+            current_chunk = ""
+
+            for paragraph in paragraphs:
+                if len(current_chunk) + len(paragraph) + 2 <= max_embed_description_length:
+                    if current_chunk:
+                        current_chunk += "\n\n" + paragraph
+                    else:
+                        current_chunk = paragraph
+                else:
+                    # If adding this paragraph would exceed the limit, save the current chunk and start a new one
+                    if current_chunk:
+                        summary_chunks.append(current_chunk)
+
+                    # If the paragraph itself is too long, split it further
+                    if len(paragraph) > max_embed_description_length:
+                        # Split by sentences or just characters if needed
+                        remaining = paragraph
+                        while remaining:
+                            chunk_size = min(max_embed_description_length, len(remaining))
+                            summary_chunks.append(remaining[:chunk_size])
+                            remaining = remaining[chunk_size:]
+                    else:
+                        current_chunk = paragraph
+
+            # Add the last chunk if there's anything left
+            if current_chunk:
+                summary_chunks.append(current_chunk)
+
+        # Send the first embed with the header
+        first_embed = discord.Embed(
+            title=f"📊 Shrnutí chatu",
+            description=summary_chunks[0],
+            color=discord.Color.blue()
+        )
+
+        first_embed.set_footer(text=f"Celkem zpráv: {message_count}")
+        first_embed.timestamp = datetime.now()
+
+        try:
+            dm_channel = await user.create_dm()
+            await dm_channel.send(embed=first_embed)
+
+            # Send additional embeds if needed
+            for i, chunk in enumerate(summary_chunks[1:], 1):
+                embed = discord.Embed(
+                    description=chunk,
+                    color=discord.Color.blue()
+                )
+
+                await dm_channel.send(embed=embed)
+        except discord.Forbidden:
+            # User has DMs disabled
+            print(f"[Summary] Could not send DM to {user.display_name} - DMs disabled")
+        except Exception as e:
+            print(f"[Summary] Error sending summary DM: {e}")
+
+    @user_summary.error
+    async def user_summary_error(self, ctx, error):
+        """Handle errors for the user_summary command"""
+        if isinstance(error, CommandOnCooldown):
+            minutes, seconds = divmod(int(error.retry_after), 60)
+            hours, minutes = divmod(minutes, 60)
+
+            if hours > 0:
+                await ctx.send(
+                    f"Tento příkaz můžeš použít pouze jednou za {SUMMARY_COOLDOWN_HOURS} hodin. "
+                    f"Zkus to znovu za {hours} hodin a {minutes} minut.",
+                    ephemeral=True
+                )
+            elif minutes > 0:
+                await ctx.send(
+                    f"Tento příkaz můžeš použít pouze jednou za {SUMMARY_COOLDOWN_HOURS} hodin. "
+                    f"Zkus to znovu za {minutes} minut a {seconds} sekund.",
+                    ephemeral=True
+                )
+            else:
+                await ctx.send(
+                    f"Tento příkaz můžeš použít pouze jednou za {SUMMARY_COOLDOWN_HOURS} hodin. "
+                    f"Zkus to znovu za {seconds} sekund.",
+                    ephemeral=True
+                )
+        else:
+            await ctx.send(f"Nastala chyba: {error}", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(ChatSummary(bot))

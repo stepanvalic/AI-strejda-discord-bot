@@ -2,17 +2,17 @@ import os
 import json
 import discord
 from discord.ext import commands
-import config_loader
+from utils import config
 
-# Get configuration from config_loader
-COUNTING_CHANNEL_ID = config_loader.get_counting_channel_id()
-COUNTING_SAVE_FILE = config_loader.get_counting_save_file()
-COUNTING_TOPIC_PREFIX = config_loader.get_counting_topic_prefix()
+COUNTING_CHANNEL_ID = config.get_int('COUNTING_CHANNEL_ID')
+COUNTING_SAVE_FILE = config.get('COUNTING_SAVE_FILE', 'db/counting.json')
+COUNTING_TOPIC_PREFIX = config.get('COUNTING_TOPIC_PREFIX', 'Počítejte od 1 do nekonečna. Další číslo: ')
 
 class Counting(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.data = self.load_data()
+        self.message_cache = {}  # Cache pro sledování zpráv v kanálu počítání
 
     def load_data(self):
         os.makedirs(os.path.dirname(COUNTING_SAVE_FILE), exist_ok=True)
@@ -53,6 +53,16 @@ class Counting(commands.Cog):
         # Funkce je prázdná, protože Discord blokuje časté aktualizace tématu kanálu
         # a není potřeba ji používat
         pass
+
+    def clean_message_cache(self, max_size=100):
+        """Vyčistí cache zpráv, pokud je příliš velká"""
+        if len(self.message_cache) > max_size:
+            # Seřadíme klíče podle ID zprávy (novější zprávy mají vyšší ID)
+            sorted_keys = sorted(self.message_cache.keys())
+            # Odstraníme nejstarší zprávy, aby zůstalo pouze max_size zpráv
+            keys_to_remove = sorted_keys[:-max_size]
+            for key in keys_to_remove:
+                del self.message_cache[key]
 
     def update_user_stats(self, user_id, username, success=True):
         user_id = str(user_id)
@@ -134,6 +144,17 @@ class Counting(commands.Cog):
             self.data["current_count"] = count
             self.data["last_user_id"] = message.author.id
 
+            # Uložení zprávy do cache
+            self.message_cache[message.id] = {
+                "content": message.content,
+                "author_id": message.author.id,
+                "author_name": message.author.display_name,
+                "count": count
+            }
+
+            # Vyčištění cache, pokud je příliš velká
+            self.clean_message_cache()
+
             self.update_user_stats(message.author.id, message.author.display_name, success=True)
 
             if count > self.data["high_score"]:
@@ -153,6 +174,75 @@ class Counting(commands.Cog):
             self.data["failed_counts"] += 1
             self.update_user_stats(message.author.id, message.author.display_name, success=False)
             self.save_data()
+
+    @commands.Cog.listener()
+    async def on_message_edit(self, before, after):
+        """Sleduje úpravy zpráv v kanálu počítání"""
+        # Kontrola, zda je zpráva z kanálu počítání
+        if before.channel.id != COUNTING_CHANNEL_ID:
+            return
+
+        # Ignorujeme zprávy od botů
+        if before.author.bot:
+            return
+
+        # Ignorujeme, pokud se obsah nezměnil
+        if before.content == after.content:
+            return
+
+        # Kontrola, zda je zpráva v cache
+        if before.id in self.message_cache:
+            cached_message = self.message_cache[before.id]
+            count = cached_message["count"]
+            author_name = cached_message["author_name"]
+
+            try:
+                # Smazání upravené zprávy
+                await after.delete()
+
+                # Poslání nové zprávy s původním číslem
+                bot_message = await before.channel.send(
+                    f"**{author_name}** upravil zprávu s číslem **{count}**. "
+                    f"Upravování zpráv není povoleno! Zde je původní číslo: **{count}**"
+                )
+
+                # Přidání reakce na novou zprávu
+                await bot_message.add_reaction("✅")
+
+            except discord.Forbidden:
+                print("Bot doesn't have permission to delete messages")
+            except Exception as e:
+                print(f"Error handling edited message: {e}")
+
+    @commands.Cog.listener()
+    async def on_message_delete(self, message):
+        """Sleduje mazání zpráv v kanálu počítání"""
+        # Kontrola, zda je zpráva z kanálu počítání
+        if message.channel.id != COUNTING_CHANNEL_ID:
+            return
+
+        # Ignorujeme zprávy od botů
+        if message.author.bot:
+            return
+
+        # Kontrola, zda je zpráva v cache a zda je to poslední platné číslo
+        if message.id in self.message_cache and self.message_cache[message.id]["count"] == self.data["current_count"]:
+            cached_message = self.message_cache[message.id]
+            count = cached_message["count"]
+            author_name = cached_message["author_name"]
+
+            try:
+                # Poslání nové zprávy s původním číslem
+                bot_message = await message.channel.send(
+                    f"**{author_name}** smazal zprávu s číslem **{count}**. "
+                    f"Mazání zpráv není povoleno! Zde je původní číslo: **{count}**"
+                )
+
+                # Přidání reakce na novou zprávu
+                await bot_message.add_reaction("✅")
+
+            except Exception as e:
+                print(f"Error handling deleted message: {e}")
 
     @commands.command(name="count")
     @commands.has_permissions(administrator=True)
@@ -231,6 +321,7 @@ class Counting(commands.Cog):
             "Jeden člověk nemůže počítat dvakrát za sebou (je potřeba alespoň dva účastníky)",
             "Pokud někdo napíše špatné číslo, počítání se resetuje na 0",
             "V kanálu jsou povolena pouze čísla, ostatní zprávy budou smazány (kromě adminů)",
+            "Upravování nebo mazání zpráv není povoleno - bot obnoví smazané nebo upravené zprávy",
             "Žádné podvádění nebo používání botů k počítání"
         ]
 
@@ -238,66 +329,6 @@ class Counting(commands.Cog):
             embed.add_field(name=f"Pravidlo {i}", value=rule, inline=False)
 
         await ctx.send(embed=embed)
-
-    @commands.Cog.listener()
-    async def on_message_edit(self, before, after):
-        """Handle message edits in the counting channel"""
-        # Ignore if not in counting channel
-        if before.channel.id != COUNTING_CHANNEL_ID:
-            return
-
-        # Ignore bot messages
-        if before.author.bot:
-            return
-
-        # Ignore if content didn't change
-        if before.content == after.content:
-            return
-
-        # Check if the original message was a valid number
-        try:
-            original_number = int(before.content.strip())
-        except ValueError:
-            return  # Original message wasn't a number, ignore
-
-        # Check if the edited message is still a number
-        try:
-            new_number = int(after.content.strip())
-        except ValueError:
-            # If edited to non-number, delete it
-            await after.delete()
-            return
-
-        # If the number was changed, handle it
-        if original_number != new_number:
-            # Delete the edited message
-            await after.delete()
-
-            # Send a notification about the edit
-            await before.channel.send(
-                f"**{before.author.display_name}** upravil zprávu z **{original_number}** na **{new_number}**. "
-                f"Úpravy čísel nejsou povoleny."
-            )
-
-            # Create a webhook to send a message as the original user
-            try:
-                # Create a webhook in the channel
-                webhook = await before.channel.create_webhook(name="CountingHelper")
-
-                # Send the original number as the user
-                await webhook.send(
-                    content=str(original_number),
-                    username=before.author.display_name,
-                    avatar_url=before.author.display_avatar.url
-                )
-
-                # Delete the webhook after use
-                await webhook.delete()
-            except discord.Forbidden:
-                # If we don't have permission to create webhooks, just send the message normally
-                await before.channel.send(
-                    f"**{before.author.display_name}**: {original_number}"
-                )
 
     @commands.command(name="countstats")
     async def count_stats(self, ctx):

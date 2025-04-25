@@ -1,9 +1,8 @@
 import discord
 from discord.ext import commands
-import config_loader
+from utils import config
 
-# Get channel ID from config
-WELCOME_CHANNEL_ID = config_loader.get_welcome_channel_id()
+WELCOME_CHANNEL_ID = config.get_int('WELCOME_CHANNEL_ID')
 
 class Welcome(commands.Cog):
     def __init__(self, bot):

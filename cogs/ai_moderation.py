@@ -5,41 +5,52 @@ import asyncio
 import datetime
 import google.generativeai as genai
 from discord.ext import commands, tasks
-from dotenv import load_dotenv
-import config_loader
+from utils import config
 
-# Load environment variables for API keys
-load_dotenv()
+# Load configuration
+GEMINI_API_KEY = config.get('GEMINI_API_KEY')
+AI_MODEL = config.get('AI_MODEL', 'gemini-2.0-flash')
+# Message batch size
+AI_MESSAGES_BATCH = config.get_int('AI_MESSAGES_BATCH')
+if not AI_MESSAGES_BATCH:
+    print("[AI Mod] ERROR: AI_MESSAGES_BATCH not set in configuration. AI moderation will not function properly.")
+    AI_MESSAGES_BATCH = 0  # Will prevent processing
+else:
+    print(f"[AI Mod] Using batch size of {AI_MESSAGES_BATCH} messages")
 
-# Get API key from .env
-GEMINI_API_KEY = config_loader.get_gemini_api_key()
+AI_MODERATION_SAVE_FILE = config.get('AI_MODERATION_SAVE_FILE', 'db/ai_moderation.json')
+AI_MODERATION_INTERVAL_MINUTES = config.get_int('AI_MODERATION_INTERVAL_MINUTES', 5)
 
-# Get configuration from config_loader
-AI_MODEL = config_loader.get_ai_model()
-AI_MESSAGES_BATCH = config_loader.get_ai_messages_batch()
-AI_MODERATION_SAVE_FILE = config_loader.get_ai_moderation_save_file()
-AI_MODERATION_INTERVAL_MINUTES = config_loader.get_ai_moderation_interval()
+# Channel IDs where moderation should be active
+AI_MODERATION_CHANNEL_IDS = config.get('AI_MODERATION_CHANNEL_IDS', [])
+# Convert to integers if provided as strings
+if AI_MODERATION_CHANNEL_IDS:
+    try:
+        AI_MODERATION_CHANNEL_IDS = [int(channel_id) if isinstance(channel_id, str) else channel_id for channel_id in AI_MODERATION_CHANNEL_IDS]
+        print(f"[AI Mod] Moderation active in {len(AI_MODERATION_CHANNEL_IDS)} channels: {AI_MODERATION_CHANNEL_IDS}")
+    except (ValueError, TypeError) as e:
+        print(f"[AI Mod] Error parsing AI_MODERATION_CHANNEL_IDS: {e}")
+        AI_MODERATION_CHANNEL_IDS = []
+else:
+    print("[AI Mod] No channel restrictions set. Moderation will be active in all channels.")
 
-# Get thresholds from config
-thresholds = config_loader.get_ai_positive_thresholds()
-AI_POSITIVE_THRESHOLD_1 = thresholds['level_1']
-AI_POSITIVE_THRESHOLD_2 = thresholds['level_2']
-AI_POSITIVE_THRESHOLD_3 = thresholds['level_3']
+# Positive thresholds
+AI_POSITIVE_THRESHOLD_1 = config.get_int('AI_POSITIVE_THRESHOLD_1', 800)
+AI_POSITIVE_THRESHOLD_2 = config.get_int('AI_POSITIVE_THRESHOLD_2', 2000)
+AI_POSITIVE_THRESHOLD_3 = config.get_int('AI_POSITIVE_THRESHOLD_3', 5000)
 
 # Negative thresholds
-negative_thresholds = config_loader.get_ai_negative_thresholds()
-AI_NEGATIVE_THRESHOLD = negative_thresholds['negative']
-AI_VERY_NEGATIVE_THRESHOLD = negative_thresholds['very_negative']
+AI_NEGATIVE_THRESHOLD = config.get_int('AI_NEGATIVE_THRESHOLD', -30)
+AI_VERY_NEGATIVE_THRESHOLD = config.get_int('AI_VERY_NEGATIVE_THRESHOLD', -1000)
 
 # Penalty for very negative messages
-AI_NEGATIVE_PENALTY = config_loader.get_ai_negative_penalty()
+AI_NEGATIVE_PENALTY = config.get_int('AI_NEGATIVE_PENALTY', -50)
 
 # Role IDs
-role_ids = config_loader.get_ai_role_ids()
-AI_POSITIVE_ROLE_ID_1 = role_ids['positive_1']
-AI_POSITIVE_ROLE_ID_2 = role_ids['positive_2']
-AI_POSITIVE_ROLE_ID_3 = role_ids['positive_3']
-AI_NEGATIVE_ROLE_ID = role_ids['negative']
+AI_POSITIVE_ROLE_ID_1 = config.get('AI_POSITIVE_ROLE_ID_1')
+AI_POSITIVE_ROLE_ID_2 = config.get('AI_POSITIVE_ROLE_ID_2')
+AI_POSITIVE_ROLE_ID_3 = config.get('AI_POSITIVE_ROLE_ID_3')
+AI_NEGATIVE_ROLE_ID = config.get('AI_NEGATIVE_ROLE_ID')
 
 # Configure Gemini API
 genai.configure(api_key=GEMINI_API_KEY)
@@ -71,7 +82,9 @@ except ValueError:
 
 class AIModeration(commands.Cog):
     def __init__(self, bot):
-        # Load configuration from config_loader
+        # Get the batch size from config
+        global AI_MESSAGES_BATCH
+        AI_MESSAGES_BATCH = config.get_int('AI_MESSAGES_BATCH')
         print(f"[AI Mod] Initialized with batch size of {AI_MESSAGES_BATCH} messages")
 
         self.bot = bot
@@ -168,6 +181,11 @@ class AIModeration(commands.Cog):
 
         # Ignore příkazy (zprávy začínající !) a odkazy
         if message.content.startswith('!') or 'http://' in message.content or 'https://' in message.content:
+            return
+
+        # Check if moderation is enabled for this channel
+        if AI_MODERATION_CHANNEL_IDS and message.channel.id not in AI_MODERATION_CHANNEL_IDS:
+            # Skip messages from channels not in the allowed list
             return
 
         # Add message to pending queue
@@ -769,6 +787,29 @@ Provide your analysis in the following JSON format:
                   f"Interval kontroly: **{AI_MODERATION_INTERVAL_MINUTES}** minut.",
             inline=False
         )
+
+        # Moderated channels
+        if AI_MODERATION_CHANNEL_IDS:
+            channel_mentions = []
+            for channel_id in AI_MODERATION_CHANNEL_IDS:
+                channel = self.bot.get_channel(channel_id)
+                if channel:
+                    channel_mentions.append(f"<#{channel_id}>")
+                else:
+                    channel_mentions.append(f"ID: {channel_id}")
+
+            embed.add_field(
+                name="Moderované kanály",
+                value=f"AI moderace je aktivní pouze v těchto kanálech:\n"
+                      f"{', '.join(channel_mentions)}",
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="Moderované kanály",
+                value=f"AI moderace je aktivní ve všech kanálech.",
+                inline=False
+            )
 
         # Scoring system
         embed.add_field(

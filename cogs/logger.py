@@ -2,18 +2,16 @@ import os
 import sys
 import logging
 import datetime
-import importlib
-import json
 from logging.handlers import RotatingFileHandler
 from discord.ext import commands
 import colorama
 from colorama import Fore, Style
-import config_loader
+from utils import config
 
-# Get configuration from config_loader
-LOG_LEVEL = config_loader.get_log_level().upper()
-LOG_MAX_SIZE = config_loader.get_log_max_size()  # 5 MB default size
-LOG_BACKUP_COUNT = config_loader.get_log_backup_count()  # Number of backup files
+# Načtení proměnných z konfigurace
+LOG_LEVEL = config.get('LOG_LEVEL', 'INFO').upper()
+LOG_MAX_SIZE = config.get_int('LOG_MAX_SIZE', 5 * 1024 * 1024)  # 5 MB výchozí velikost
+LOG_BACKUP_COUNT = config.get_int('LOG_BACKUP_COUNT', 10)  # Počet záložních souborů
 
 # Mapování textových úrovní logování na konstanty z modulu logging
 LOG_LEVELS = {
@@ -194,8 +192,8 @@ class LoggerCog(commands.Cog):
         # Nastavení nové úrovně
         self.logger.setLevel(LOG_LEVELS[level])
 
-        # Aktualizace konfiguračního souboru
-        self._update_config_value('LOG_LEVEL', level)
+        # Aktualizace .env souboru
+        self._update_env_file('LOG_LEVEL', level)
 
         # Aktualizace globální proměnné
         global LOG_LEVEL
@@ -204,56 +202,62 @@ class LoggerCog(commands.Cog):
         self.logger.info(f"Úroveň logování změněna na {level}")
         await ctx.send(f"Úroveň logování nastavena na {level}")
 
-    def _update_config_value(self, key, value):
-        """Updates a value in config.json using a dot-notation path"""
-        try:
-            # Map old config keys to new dot-notation paths
-            key_mapping = {
-                'LOG_LEVEL': 'logger.level',
-                'LOG_MAX_SIZE': 'logger.max_size',
-                'LOG_BACKUP_COUNT': 'logger.backup_count'
-            }
+    def _update_env_file(self, key, value):
+        """Aktualizuje hodnotu v konfiguraci"""
+        # Check if this is a sensitive key that should be in .env
+        sensitive_keys = ['DISCORD_TOKEN', 'YOUTUBE_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY']
 
-            # Convert old key to new path
-            key_path = key_mapping.get(key, key)
+        if key in sensitive_keys:
+            # Update .env file for sensitive keys
+            env_path = '.env'
+            try:
+                with open(env_path, 'r') as file:
+                    lines = file.readlines()
 
-            # Load the current config
-            with open('config.json', 'r', encoding='utf-8') as file:
-                config = json.load(file)
+                # Hledáme řádek s daným klíčem
+                key_exists = False
+                for i, line in enumerate(lines):
+                    if line.startswith(f"{key}=") or line.startswith(f"# {key}="):
+                        lines[i] = f"{key}={value}\n"
+                        key_exists = True
+                        break
 
-            # Parse the key path
-            keys = key_path.split('.')
+                # Pokud klíč neexistuje, přidáme ho na konec souboru
+                if not key_exists:
+                    lines.append(f"{key}={value}\n")
 
-            # Navigate to the nested location
-            current = config
-            for i, k in enumerate(keys[:-1]):
-                if k not in current:
-                    current[k] = {}
-                current = current[k]
+                # Zapíšeme změny zpět do souboru
+                with open(env_path, 'w') as file:
+                    file.writelines(lines)
 
-            # Update the value
-            current[keys[-1]] = value
+                self.logger.info(f"Hodnota {key} byla aktualizována v .env souboru")
+            except Exception as e:
+                self.logger.error(f"Chyba při aktualizaci .env souboru: {e}")
+        else:
+            # Update config.json for non-sensitive keys
+            try:
+                import json
+                config_path = 'config.json'
 
-            # Write the updated config back to the file
-            with open('config.json', 'w', encoding='utf-8') as file:
-                json.dump(config, file, indent=2)
+                try:
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        config_data = json.load(f)
+                except (FileNotFoundError, json.JSONDecodeError):
+                    config_data = {}
 
-            self.logger.info(f"Value {key_path} was updated in config.json")
+                # Update the value
+                config_data[key] = value
 
-            # Reload the config_loader module to reflect changes
-            importlib.reload(config_loader)
+                # Save back to config.json
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    json.dump(config_data, f, indent=4)
 
-            # Update global variables
-            global LOG_LEVEL, LOG_MAX_SIZE, LOG_BACKUP_COUNT
-            if key == 'LOG_LEVEL':
-                LOG_LEVEL = value.upper()
-            elif key == 'LOG_MAX_SIZE':
-                LOG_MAX_SIZE = value
-            elif key == 'LOG_BACKUP_COUNT':
-                LOG_BACKUP_COUNT = value
+                self.logger.info(f"Hodnota {key} byla aktualizována v config.json")
+            except Exception as e:
+                self.logger.error(f"Chyba při aktualizaci config.json: {e}")
 
-        except Exception as e:
-            self.logger.error(f"Error updating config.json: {e}")
+        # Update the in-memory configuration
+        config.set(key, value)
 
 async def setup(bot):
     await bot.add_cog(LoggerCog(bot))

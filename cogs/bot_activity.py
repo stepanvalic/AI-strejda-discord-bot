@@ -1,6 +1,10 @@
 import discord
 from discord.ext import commands, tasks
-import config_loader
+from utils import config
+
+GUILD_ID = config.get_int('GUILD_ID')
+ACTIVITY_BASE_TEXT = config.get('ACTIVITY_BASE_TEXT', 'Sleduji')
+ACTIVITY_FORMAT_TEXT = config.get('ACTIVITY_FORMAT_TEXT', '{count} darebáků')
 
 class BotActivity(commands.Cog):
     def __init__(self, bot):
@@ -12,9 +16,9 @@ class BotActivity(commands.Cog):
 
     @tasks.loop(minutes=5)
     async def change_status(self):
-        guild = self.bot.get_guild(config_loader.get_guild_id())
+        guild = self.bot.get_guild(GUILD_ID)
         member_count = guild.member_count if guild else 0
-        status = f"{config_loader.get_activity_base_text()} {config_loader.get_activity_format_text().format(count=member_count)}"
+        status = f"{ACTIVITY_BASE_TEXT} {ACTIVITY_FORMAT_TEXT.format(count=member_count)}"
 
         await self.bot.change_presence(
             activity=discord.Activity(
