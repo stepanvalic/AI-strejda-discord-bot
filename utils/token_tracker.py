@@ -10,8 +10,12 @@ TOKEN_USAGE_FILE = "token_usage.json"
 TOKEN_PRICES = {
     # DeepSeek modely
     "deepseek-chat": {
-        "input": 0.0005,  # $0.0005 za 1000 input tokenů
-        "output": 0.0025  # $0.0025 za 1000 output tokenů
+        "input": 0.0005,  # $0.0005 za 1000 input tokenů (DeepSeek-V3)
+        "output": 0.0025  # $0.0025 za 1000 output tokenů (DeepSeek-V3)
+    },
+    "deepseek-reasoner": {
+        "input": 0.0005,  # $0.0005 za 1000 input tokenů (DeepSeek-R1)
+        "output": 0.0025  # $0.0025 za 1000 output tokenů (DeepSeek-R1)
     },
     # OpenRouter modely (ceny se mohou lišit podle konkrétního modelu)
     "deepseek/deepseek-chat-v3-0324:free": {
@@ -121,20 +125,22 @@ def extract_tokens_from_deepseek_response(response_data, operation):
     """Extrahuje informace o tokenech z odpovědi DeepSeek API
 
     Args:
-        response_data (dict): Odpověď z DeepSeek API
+        response_data (dict): Odpověď z DeepSeek API (kompatibilní s OpenAI API formátem)
         operation (str): Typ operace
 
     Returns:
         bool: True pokud se podařilo extrahovat a zaznamenat tokeny
     """
     try:
-        # DeepSeek API vrací informace o tokenech v klíči 'usage'
+        # DeepSeek API vrací informace o tokenech v klíči 'usage' (stejně jako OpenAI API)
         if 'usage' in response_data:
             usage = response_data['usage']
             prompt_tokens = usage.get('prompt_tokens', 0)
             completion_tokens = usage.get('completion_tokens', 0)
             total_tokens = usage.get('total_tokens', prompt_tokens + completion_tokens)
 
+            # Získáme model z odpovědi nebo z konfigurace
+            # 'deepseek-chat' odpovídá DeepSeek-V3, 'deepseek-reasoner' odpovídá DeepSeek-R1
             model = response_data.get('model', config.get('DEEPSEEK_MODEL', 'unknown'))
 
             log_token_usage('deepseek', model, operation, prompt_tokens, completion_tokens, total_tokens)
