@@ -220,24 +220,43 @@ class ChatSummary(commands.Cog):
             "kde index je pořadové číslo zprávy v seznamu (začíná od 0). "
             "Zahrň odkazy na zprávy, které jsou v textu (začínají http:// nebo https://). "
             "Formát výstupu by měl být následující:\n\n"
-            "## Téma 1 [TOPIC_START:5]\n"
-            "Shrnutí tématu 1...\n\n"
-            "## Téma 2 [TOPIC_START:12]\n"
-            "Shrnutí tématu 2...\n\n"
+            "📊 Shrnutí chatu za YYYY-MM-DD\n"
+            "Shrnutí diskuzí z Discord chatu (DD. M. YYYY)\n"
+            "---\n\n"
+            "#### 1. Název tématu [TOPIC_START:5]\n"
+            "Hlavní téma: Stručný popis hlavního tématu v jedné větě.\n"
+            "Detaily: Podrobnější shrnutí diskuze, klíčové body, závěry.\n"
+            "Odkazy: Seznam odkazů zmíněných v diskuzi (pokud existují).\n"
+            "Vývoj: Jak se téma vyvíjelo, k jakému závěru diskuze dospěla.\n"
+            "Citace: Zajímavé nebo důležité citace z diskuze (pokud existují).\n\n"
+            "---\n\n"
+            "#### 2. Název tématu [TOPIC_START:12]\n"
+            "Hlavní téma: Stručný popis hlavního tématu v jedné větě.\n"
+            "Detaily: Podrobnější shrnutí diskuze, klíčové body, závěry.\n"
+            "Odkazy: Seznam odkazů zmíněných v diskuzi (pokud existují).\n"
+            "Vývoj: Jak se téma vyvíjelo, k jakému závěru diskuze dospěla.\n"
+            "Citace: Zajímavé nebo důležité citace z diskuze (pokud existují).\n\n"
+            "---\n\n"
             "Kde čísla 5 a 12 jsou indexy zpráv, které začínají dané téma. "
             "Tyto indexy budou později nahrazeny odkazy na konkrétní zprávy ve formátu [téma](url), což umožní uživatelům "
             "přejít přímo na začátek daného tématu v historii chatu. Je důležité, aby každé téma "
-            "mělo označení [TOPIC_START:index] hned za jeho názvem."
+            "mělo označení [TOPIC_START:index] hned za jeho názvem. "
+            "Formátuj datum v hlavičce správně - DD. M. YYYY znamená den, měsíc a rok s tečkami (např. 18. 4. 2025)."
         )
 
         user_prompt = (
             f"Zde jsou zprávy z Discord chatu ze dne {date}. Vytvoř strukturované shrnutí "
             f"hlavních témat, která se probírala. Rozděl shrnutí podle témat a zahrň důležité "
             f"body diskuze. Pro každé téma identifikuj první zprávu, která toto téma začíná, a označ ji jako 'TOPIC_START:index'. "
-            f"Formát by měl být: '## Název tématu [TOPIC_START:index]'. "
+            f"Formát by měl být: '#### N. Název tématu [TOPIC_START:index]', kde N je pořadové číslo tématu. "
+            f"Každé téma by mělo obsahovat sekce: Hlavní téma (stručný popis), Detaily, Odkazy (pokud existují), "
+            f"Vývoj a případně Citace. Mezi tématy vždy přidej oddělovač '---'. "
             f"Pokud se v textu vyskytují odkazy, zahrň je do shrnutí. "
             f"Nezapomeň, že každé téma musí mít označení [TOPIC_START:index], aby uživatelé mohli kliknout na odkaz a přejít na začátek tématu. "
-            f"Tyto indexy budou později nahrazeny odkazy ve formátu [téma](url).\n\n"
+            f"Tyto indexy budou později nahrazeny odkazy ve formátu [téma](url). "
+            f"Na konci shrnutí přidej sekci 'Celkové shrnutí:' s krátkým souhrnem celého dne. "
+            f"Pokud se v chatu vyskytl nějaký vtipný moment, přidej před celkové shrnutí sekci 'Nejvtipnější moment:'. "
+            f"Formát hlavičky by měl být: '📊 Shrnutí chatu za {date}\\nShrnutí diskuzí z Discord chatu (DD. M. YYYY)\\n---'\n\n"
             f"{all_messages}"
         )
 
@@ -518,8 +537,8 @@ class ChatSummary(commands.Cog):
             debug_print(f"Split summary into {len(summary_chunks)} chunks")
 
         # Send the first embed with the header
+        # Nadpis je již součástí shrnutí, takže ho nemusíme přidávat do title
         first_embed = discord.Embed(
-            title=f"📊 Shrnutí chatu za {date}",
             description=summary_chunks[0],
             color=discord.Color.blue()
         )
@@ -857,8 +876,8 @@ class ChatSummary(commands.Cog):
             debug_print(f"Split summary into {len(summary_chunks)} chunks")
 
         # Send the first embed with the header
+        # Nadpis je již součástí shrnutí, takže ho nemusíme přidávat do title
         first_embed = discord.Embed(
-            title=f"📊 Shrnutí chatu",
             description=summary_chunks[0],
             color=discord.Color.blue()
         )
