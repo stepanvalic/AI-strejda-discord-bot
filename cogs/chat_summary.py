@@ -4,6 +4,7 @@ import discord
 from discord.ext import commands, tasks
 import aiohttp
 import asyncio
+import traceback
 from datetime import datetime, time, timedelta
 from utils import chat_db, config
 from discord.ext.commands import CommandOnCooldown, BucketType
@@ -17,6 +18,12 @@ OPENROUTER_MODEL = config.get('OPENROUTER_MODEL', '')
 DEEPSEEK_API_KEY = config.get('DEEPSEEK_API_KEY', '')
 DEEPSEEK_MODEL = config.get('DEEPSEEK_MODEL', 'deepseek-chat')
 SUMMARY_COOLDOWN_HOURS = config.get_int('SUMMARY_COOLDOWN_HOURS', 6)
+SUMMARY_DEBUG = config.get_bool('SUMMARY_DEBUG', False)
+
+def debug_print(*args, **kwargs):
+    """Print debug messages only if SUMMARY_DEBUG is enabled"""
+    if SUMMARY_DEBUG:
+        print("[Summary Debug]", *args, **kwargs)
 
 class ChatSummary(commands.Cog):
     def __init__(self, bot):
@@ -72,21 +79,37 @@ class ChatSummary(commands.Cog):
     async def daily_summary(self):
         """Generate and send daily summary at 3 AM"""
         print("[Summary] Starting daily summary generation...")
+        debug_print("Starting automatic daily summary generation")
 
         # Get yesterday's date
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        debug_print(f"Target date for summary: {yesterday} (yesterday)")
 
         # Check if we already have a summary for yesterday
         existing_summary = chat_db.get_summary_by_date(yesterday)
+        if existing_summary:
+            debug_print(f"Found existing summary for {yesterday}")
+            debug_print(f"Existing summary info: message_count={existing_summary.get('message_count')}, manual={existing_summary.get('manual')}, auto_generated={existing_summary.get('auto_generated')}")
 
         # Get messages from yesterday
         messages = chat_db.get_messages_by_date(yesterday)
+        debug_print(f"Retrieved {len(messages) if messages else 0} messages for {yesterday}")
 
         if not messages:
             print(f"[Summary] No messages found for {yesterday}, skipping")
+            debug_print(f"No messages found for {yesterday}, skipping summary generation")
             return
 
         print(f"[Summary] Found {len(messages)} messages for {yesterday}")
+
+        if SUMMARY_DEBUG:
+            # Log a sample of messages in debug mode
+            sample_size = min(5, len(messages))
+            debug_print(f"Sample of {sample_size} messages:")
+            for i, msg in enumerate(messages[:sample_size]):
+                username = msg.get("display_name") or msg.get("username", "Unknown")
+                content = msg.get("content", "")
+                debug_print(f"  Message {i+1}: {username}: {content[:100]}...")
 
         # If a summary already exists, check if it was manually created
         if existing_summary:
@@ -98,20 +121,33 @@ class ChatSummary(commands.Cog):
 
             if is_manual:
                 print(f"[Summary] Manual summary for {yesterday} found, regenerating it")
+                debug_print(f"Manual summary for {yesterday} found, will regenerate it")
             else:
                 print(f"[Summary] Automatic summary for {yesterday} already exists, skipping")
+                debug_print(f"Automatic summary for {yesterday} already exists, skipping generation")
                 return
 
         # Generate summary
+        debug_print(f"Generating summary for {yesterday} with {len(messages)} messages")
         summary = await self.generate_summary(messages, yesterday)
 
         if not summary:
             print("[Summary] Failed to generate summary")
+            debug_print("Failed to generate summary")
             return
+
+        debug_print(f"Summary generated successfully, length: {len(summary)} characters")
+        debug_print(f"Summary preview (first 500 chars): {summary[:500]}...")
 
         # Extract message IDs from the summary for topic beginnings
         import re
         topic_links = re.findall(r'\[téma\]\(https://discord\.com/channels/\d+/\d+/(\d+)\)', summary)
+        debug_print(f"Extracted {len(topic_links)} topic links from summary")
+
+        if SUMMARY_DEBUG and topic_links:
+            debug_print("Topic links found:")
+            for i, link in enumerate(topic_links):
+                debug_print(f"  Topic {i+1}: Message ID {link}")
 
         # Save summary to database with message IDs for topics
         summary_data = {
@@ -123,14 +159,20 @@ class ChatSummary(commands.Cog):
             "auto_generated": True  # Mark as automatically generated
         }
 
+        debug_print(f"Saving summary to database: {json.dumps(summary_data, ensure_ascii=False, default=str)[:500]}...")
         chat_db.save_summary(summary_data)
+        debug_print("Summary saved to database successfully")
 
         # Send summary to the default channel
+        debug_print("Sending summary to the default channel")
         await self.send_summary(summary_data)
+        debug_print("Summary sent successfully")
 
         # Clean up old messages (keep last 30 days)
+        debug_print("Cleaning up old messages (keeping last 30 days)")
         remaining_messages = chat_db.clean_old_messages(30)
         print(f"[Summary] Cleaned up old messages, {remaining_messages} messages remaining")
+        debug_print(f"Cleaned up old messages, {remaining_messages} messages remaining in database")
 
     @daily_summary.before_loop
     async def before_daily_summary(self):
@@ -199,6 +241,10 @@ class ChatSummary(commands.Cog):
             f"{all_messages}"
         )
 
+        debug_print(f"Prepared {len(message_texts)} messages for summarization")
+        debug_print(f"System prompt: {system_prompt}")
+        debug_print(f"User prompt (first 500 chars): {user_prompt[:500]}...")
+
         # Choose API provider based on configuration
         if SUMMARY_API_PROVIDER.lower() == 'deepseek':
             # Use DeepSeek API
@@ -207,6 +253,7 @@ class ChatSummary(commands.Cog):
                 return None
 
             print(f"[Summary] Generating summary for {date} with {len(messages)} messages using DeepSeek model {DEEPSEEK_MODEL}")
+            debug_print(f"Using DeepSeek API with model {DEEPSEEK_MODEL}")
 
             try:
                 async with aiohttp.ClientSession() as session:
@@ -223,6 +270,9 @@ class ChatSummary(commands.Cog):
                         ]
                     }
 
+                    debug_print(f"DeepSeek API request payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
+                    debug_print(f"Sending request to DeepSeek API: https://api.deepseek.com/chat/completions")
+
                     async with session.post(
                         "https://api.deepseek.com/chat/completions",
                         headers=headers,
@@ -231,17 +281,23 @@ class ChatSummary(commands.Cog):
                         if response.status != 200:
                             error_text = await response.text()
                             print(f"[Summary] DeepSeek API error: {response.status} - {error_text}")
+                            debug_print(f"DeepSeek API error response: {error_text}")
                             return None
 
                         data = await response.json()
+                        debug_print(f"DeepSeek API response: {json.dumps(data, ensure_ascii=False, indent=2)}")
 
                         if not data.get("choices") or not data["choices"][0].get("message"):
                             print(f"[Summary] Invalid response from DeepSeek API: {data}")
                             return None
 
                         summary = data["choices"][0]["message"]["content"]
+                        debug_print(f"DeepSeek API summary (first 500 chars): {summary[:500]}...")
             except Exception as e:
                 print(f"[Summary] Error calling DeepSeek API: {e}")
+                debug_print(f"Exception when calling DeepSeek API: {str(e)}")
+                debug_print(f"Exception type: {type(e).__name__}")
+                debug_print(f"Exception traceback: {traceback.format_exc()}")
                 return None
 
         else:
@@ -255,6 +311,7 @@ class ChatSummary(commands.Cog):
                 return None
 
             print(f"[Summary] Generating summary for {date} with {len(messages)} messages using OpenRouter model {OPENROUTER_MODEL}")
+            debug_print(f"Using OpenRouter API with model {OPENROUTER_MODEL}")
 
             try:
                 async with aiohttp.ClientSession() as session:
@@ -271,6 +328,9 @@ class ChatSummary(commands.Cog):
                         ]
                     }
 
+                    debug_print(f"OpenRouter API request payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
+                    debug_print(f"Sending request to OpenRouter API: https://openrouter.ai/api/v1/chat/completions")
+
                     async with session.post(
                         "https://openrouter.ai/api/v1/chat/completions",
                         headers=headers,
@@ -279,17 +339,23 @@ class ChatSummary(commands.Cog):
                         if response.status != 200:
                             error_text = await response.text()
                             print(f"[Summary] OpenRouter API error: {response.status} - {error_text}")
+                            debug_print(f"OpenRouter API error response: {error_text}")
                             return None
 
                         data = await response.json()
+                        debug_print(f"OpenRouter API response: {json.dumps(data, ensure_ascii=False, indent=2)}")
 
                         if not data.get("choices") or not data["choices"][0].get("message"):
                             print(f"[Summary] Invalid response from OpenRouter API: {data}")
                             return None
 
                         summary = data["choices"][0]["message"]["content"]
+                        debug_print(f"OpenRouter API summary (first 500 chars): {summary[:500]}...")
             except Exception as e:
                 print(f"[Summary] Error calling OpenRouter API: {e}")
+                debug_print(f"Exception when calling OpenRouter API: {str(e)}")
+                debug_print(f"Exception type: {type(e).__name__}")
+                debug_print(f"Exception traceback: {traceback.format_exc()}")
                 return None
 
         # Process the summary to replace TOPIC_START markers with actual message links
@@ -312,10 +378,14 @@ class ChatSummary(commands.Cog):
 
     async def send_summary(self, summary_data, channel_id=None):
         """Send the summary to the designated channel or a specific channel"""
+        debug_print(f"Sending summary to channel, channel_id={channel_id or 'default'}")
+
         target_channel_id = channel_id or SUMMARY_CHANNEL_ID
+        debug_print(f"Target channel ID: {target_channel_id}")
 
         if not target_channel_id:
             print("[Summary] Summary channel ID is not set")
+            debug_print("Summary channel ID is not set, cannot send summary")
             return
 
         # Get the channel
@@ -323,16 +393,21 @@ class ChatSummary(commands.Cog):
 
         if not target_channel:
             print(f"[Summary] Channel with ID {target_channel_id} not found")
+            debug_print(f"Channel with ID {target_channel_id} not found")
             return
+
+        debug_print(f"Found target channel: {target_channel.name} (ID: {target_channel.id})")
 
         # Update the summary channel if we're using the default
         if not channel_id and not self.summary_channel:
             self.summary_channel = target_channel
+            debug_print("Updated default summary channel reference")
 
         # Create embed
         date = summary_data.get("date", "Unknown date")
         message_count = summary_data.get("message_count", 0)
         summary = summary_data.get("summary", "No summary available")
+        debug_print(f"Preparing summary for date {date}, message count: {message_count}, summary length: {len(summary)}")
 
         # Split summary into chunks if it's too long
         max_embed_description_length = 4096
@@ -340,7 +415,9 @@ class ChatSummary(commands.Cog):
 
         if len(summary) <= max_embed_description_length:
             summary_chunks = [summary]
+            debug_print("Summary fits in a single embed")
         else:
+            debug_print(f"Summary exceeds max embed length ({len(summary)} > {max_embed_description_length}), splitting into chunks")
             # Split by paragraphs first
             paragraphs = summary.split("\n\n")
             current_chunk = ""
@@ -371,6 +448,8 @@ class ChatSummary(commands.Cog):
             if current_chunk:
                 summary_chunks.append(current_chunk)
 
+            debug_print(f"Split summary into {len(summary_chunks)} chunks")
+
         # Send the first embed with the header
         first_embed = discord.Embed(
             title=f"📊 Shrnutí chatu za {date}",
@@ -381,16 +460,29 @@ class ChatSummary(commands.Cog):
         first_embed.set_footer(text=f"Celkem zpráv: {message_count}")
         first_embed.timestamp = datetime.now()
 
-        await target_channel.send(embed=first_embed)
+        debug_print("Sending first embed with header")
+        try:
+            await target_channel.send(embed=first_embed)
+            debug_print("First embed sent successfully")
 
-        # Send additional embeds if needed
-        for i, chunk in enumerate(summary_chunks[1:], 1):
-            embed = discord.Embed(
-                description=chunk,
-                color=discord.Color.blue()
-            )
+            # Send additional embeds if needed
+            if len(summary_chunks) > 1:
+                debug_print(f"Sending {len(summary_chunks) - 1} additional embeds")
+                for i, chunk in enumerate(summary_chunks[1:], 1):
+                    embed = discord.Embed(
+                        description=chunk,
+                        color=discord.Color.blue()
+                    )
 
-            await target_channel.send(embed=embed)
+                    await target_channel.send(embed=embed)
+                    debug_print(f"Sent chunk {i+1}/{len(summary_chunks)}")
+
+            debug_print("All summary chunks sent successfully")
+        except Exception as e:
+            print(f"[Summary] Error sending summary to channel: {e}")
+            debug_print(f"Error sending summary to channel: {str(e)}")
+            debug_print(f"Exception type: {type(e).__name__}")
+            debug_print(f"Exception traceback: {traceback.format_exc()}")
 
     @commands.command(name="sumarizace-souhrn")
     @commands.has_permissions(administrator=True)
@@ -403,35 +495,57 @@ class ChatSummary(commands.Cog):
         channel: Volitelný kanál, kam poslat shrnutí
         """
         await ctx.send("Generuji shrnutí chatu...", ephemeral=True)
+        debug_print(f"Command sumarizace-souhrn executed by {ctx.author.name} (ID: {ctx.author.id})")
+        debug_print(f"Parameters: date_str={date_str}, channel={channel.name if channel else None}")
 
         # Get the date
         if date_str:
             # Convert from DD/MM/YYYY to YYYY-MM-DD
             date = chat_db.convert_date_format(date_str)
+            debug_print(f"Converting date format from {date_str} to {date}")
             if not date:
                 await ctx.send("Neplatný formát data. Použijte formát DD/MM/RRRR (např. 01/05/2024).", ephemeral=True)
+                debug_print(f"Invalid date format: {date_str}")
                 return
         else:
             # Default to yesterday
             date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            debug_print(f"No date provided, using yesterday: {date}")
 
         # Get messages for the specified date
         try:
             messages = chat_db.get_messages_by_date(date)
             print(f"[Summary] Daily summary command: Found {len(messages)} messages for {date}")
+            debug_print(f"Retrieved {len(messages)} messages for date {date}")
+
+            if SUMMARY_DEBUG:
+                # Log a sample of messages in debug mode
+                sample_size = min(5, len(messages))
+                debug_print(f"Sample of {sample_size} messages:")
+                for i, msg in enumerate(messages[:sample_size]):
+                    username = msg.get("display_name") or msg.get("username", "Unknown")
+                    content = msg.get("content", "")
+                    debug_print(f"  Message {i+1}: {username}: {content[:100]}...")
         except Exception as e:
             print(f"[Summary] Error getting messages by date: {e}")
+            debug_print(f"Error getting messages by date: {str(e)}")
+            debug_print(f"Exception type: {type(e).__name__}")
+            debug_print(f"Exception traceback: {traceback.format_exc()}")
             await ctx.send(f"Chyba při získávání zpráv: {e}", ephemeral=True)
             return
 
         if not messages:
             print(f"[Summary] Daily summary command: No messages found for {date}")
+            debug_print(f"No messages found for date {date}")
             await ctx.send(f"Žádné zprávy pro {date} nebyly nalezeny.", ephemeral=True)
             return
 
         # Check if we already have a summary for this date
         existing_summary = chat_db.get_summary_by_date(date)
         if existing_summary:
+            debug_print(f"Found existing summary for date {date}")
+            debug_print(f"Existing summary info: message_count={existing_summary.get('message_count')}, manual={existing_summary.get('manual')}, auto_generated={existing_summary.get('auto_generated')}")
+
             # Ask if the user wants to regenerate
             await ctx.send(
                 f"Pro datum {date} již existuje shrnutí. Chcete ho přegenerovat? (ano/ne)",
@@ -444,31 +558,45 @@ class ChatSummary(commands.Cog):
                     return m.author == ctx.author and m.channel == ctx.channel and m.content.lower() in ["ano", "ne"]
 
                 response = await self.bot.wait_for("message", check=check, timeout=30.0)
+                debug_print(f"User response: {response.content}")
 
                 if response.content.lower() == "ne":
                     await ctx.send("Operace zrušena.", ephemeral=True)
+                    debug_print("Operation cancelled by user")
                     return
 
                 # Delete the response message if possible
                 try:
                     await response.delete()
-                except:
-                    pass
+                except Exception as e:
+                    debug_print(f"Could not delete response message: {str(e)}")
 
             except asyncio.TimeoutError:
                 await ctx.send("Čas na odpověď vypršel. Operace zrušena.", ephemeral=True)
+                debug_print("Response timeout, operation cancelled")
                 return
 
         # Generate summary
+        debug_print(f"Generating summary for {date} with {len(messages)} messages")
         summary = await self.generate_summary(messages, date)
 
         if not summary:
             await ctx.send("Nepodařilo se vygenerovat shrnutí.", ephemeral=True)
+            debug_print("Failed to generate summary")
             return
+
+        debug_print(f"Summary generated successfully, length: {len(summary)} characters")
+        debug_print(f"Summary preview (first 500 chars): {summary[:500]}...")
 
         # Extract message IDs from the summary for topic beginnings
         import re
         topic_links = re.findall(r'\[téma\]\(https://discord\.com/channels/\d+/\d+/(\d+)\)', summary)
+        debug_print(f"Extracted {len(topic_links)} topic links from summary")
+
+        if SUMMARY_DEBUG and topic_links:
+            debug_print("Topic links found:")
+            for i, link in enumerate(topic_links):
+                debug_print(f"  Topic {i+1}: Message ID {link}")
 
         # Save summary to database with message IDs for topics
         summary_data = {
@@ -481,13 +609,18 @@ class ChatSummary(commands.Cog):
             "manual": True  # Mark as manually created
         }
 
+        debug_print(f"Saving summary to database: {json.dumps(summary_data, ensure_ascii=False, default=str)[:500]}...")
         chat_db.save_summary(summary_data)
+        debug_print("Summary saved to database successfully")
 
         # Get target channel ID
         target_channel_id = channel.id if channel else None
+        debug_print(f"Target channel ID: {target_channel_id or 'default'}")
 
         # Send summary to channel
+        debug_print("Sending summary to channel")
         await self.send_summary(summary_data, target_channel_id)
+        debug_print("Summary sent successfully")
 
         # Format date for display (YYYY-MM-DD to DD/MM/YYYY)
         display_date = f"{date[8:10]}/{date[5:7]}/{date[0:4]}"
@@ -495,8 +628,10 @@ class ChatSummary(commands.Cog):
         # Prepare confirmation message
         if channel:
             await ctx.send(f"Shrnutí pro {display_date} bylo vygenerováno a odesláno do kanálu {channel.mention}.", ephemeral=True)
+            debug_print(f"Summary for {display_date} sent to channel {channel.name}")
         else:
             await ctx.send(f"Shrnutí pro {display_date} bylo vygenerováno a odesláno do výchozího kanálu.", ephemeral=True)
+            debug_print(f"Summary for {display_date} sent to default channel")
 
     @commands.command(name="sumarizace")
     @commands.cooldown(1, SUMMARY_COOLDOWN_HOURS*60*60, BucketType.user)  # 1 use per X hours per user
@@ -507,43 +642,72 @@ class ChatSummary(commands.Cog):
         -----------
         count: Počet zpráv k sumarizaci (výchozí: 100, maximum: 500)
         """
+        debug_print(f"Command sumarizace executed by {ctx.author.name} (ID: {ctx.author.id})")
+        debug_print(f"Parameters: count={count}")
+
         # Check if count is within reasonable limits
         if count > 500:
             await ctx.send("Maximální počet zpráv pro sumarizaci je 500.", ephemeral=True)
             ctx.command.reset_cooldown(ctx)
+            debug_print(f"Count {count} exceeds maximum limit (500), command cancelled")
             return
 
         if count < 10:
             await ctx.send("Minimální počet zpráv pro sumarizaci je 10.", ephemeral=True)
             ctx.command.reset_cooldown(ctx)
+            debug_print(f"Count {count} is below minimum limit (10), command cancelled")
             return
 
         # Admin bypass for cooldown
         if ctx.author.guild_permissions.administrator:
             ctx.command.reset_cooldown(ctx)
+            debug_print("Admin user detected, cooldown bypassed")
 
         await ctx.send(f"Generuji shrnutí posledních {count} zpráv. Výsledek ti pošlu do soukromé zprávy.", ephemeral=True)
 
         try:
             # Get the latest messages
+            debug_print(f"Retrieving latest {count} messages")
             messages = chat_db.get_latest_messages(count)
             print(f"[Summary] User summary: Found {len(messages)} messages for user {ctx.author.display_name}")
+            debug_print(f"Retrieved {len(messages)} messages")
+
+            if SUMMARY_DEBUG:
+                # Log a sample of messages in debug mode
+                sample_size = min(5, len(messages))
+                debug_print(f"Sample of {sample_size} messages:")
+                for i, msg in enumerate(messages[:sample_size]):
+                    username = msg.get("display_name") or msg.get("username", "Unknown")
+                    content = msg.get("content", "")
+                    debug_print(f"  Message {i+1}: {username}: {content[:100]}...")
 
             if not messages:
                 await ctx.send("Nenalezeny žádné zprávy k sumarizaci.", ephemeral=True)
+                debug_print("No messages found, command cancelled")
                 return
 
             # Generate summary
             current_date = datetime.now().strftime("%Y-%m-%d")
+            debug_print(f"Generating summary for {len(messages)} messages with date {current_date}")
             summary = await self.generate_summary(messages, current_date)
 
             if not summary:
                 await ctx.send("Nepodařilo se vygenerovat shrnutí.", ephemeral=True)
+                debug_print("Failed to generate summary")
                 return
+
+            debug_print(f"Summary generated successfully, length: {len(summary)} characters")
+            debug_print(f"Summary preview (first 500 chars): {summary[:500]}...")
 
             # Extract message IDs from the summary for topic beginnings
             import re
             topic_links = re.findall(r'\[téma\]\(https://discord\.com/channels/\d+/\d+/(\d+)\)', summary)
+            debug_print(f"Extracted {len(topic_links)} topic links from summary")
+
+            if SUMMARY_DEBUG and topic_links:
+                debug_print("Topic links found:")
+                for i, link in enumerate(topic_links):
+                    debug_print(f"  Topic {i+1}: Message ID {link}")
 
             # Create summary data
             summary_data = {
@@ -556,22 +720,33 @@ class ChatSummary(commands.Cog):
                 "manual": True  # Mark as manually created
             }
 
+            debug_print(f"Created summary data: {json.dumps(summary_data, ensure_ascii=False, default=str)[:500]}...")
+
             # Send summary to user via DM
+            debug_print(f"Sending summary to user {ctx.author.name} via DM")
             await self.send_summary_dm(ctx.author, summary_data)
+            debug_print("Summary sent to user's DM successfully")
 
             # Confirm to the user
             await ctx.send("Shrnutí bylo vygenerováno a posláno do tvých soukromých zpráv.", ephemeral=True)
+            debug_print(f"Command completed successfully for user {ctx.author.name}")
 
         except Exception as e:
             print(f"[Summary] Error generating user summary: {e}")
+            debug_print(f"Error generating user summary: {str(e)}")
+            debug_print(f"Exception type: {type(e).__name__}")
+            debug_print(f"Exception traceback: {traceback.format_exc()}")
             await ctx.send(f"Chyba při generování shrnutí: {e}", ephemeral=True)
             # Don't reset cooldown on error to prevent abuse
 
     async def send_summary_dm(self, user, summary_data):
         """Send the summary to a user via DM"""
+        debug_print(f"Preparing to send summary DM to user {user.name} (ID: {user.id})")
+
         # Create embed
         message_count = summary_data.get("message_count", 0)
         summary = summary_data.get("summary", "No summary available")
+        debug_print(f"Summary length: {len(summary)} characters, message count: {message_count}")
 
         # Split summary into chunks if it's too long
         max_embed_description_length = 4096
@@ -579,7 +754,9 @@ class ChatSummary(commands.Cog):
 
         if len(summary) <= max_embed_description_length:
             summary_chunks = [summary]
+            debug_print("Summary fits in a single embed")
         else:
+            debug_print(f"Summary exceeds max embed length ({len(summary)} > {max_embed_description_length}), splitting into chunks")
             # Split by paragraphs first
             paragraphs = summary.split("\n\n")
             current_chunk = ""
@@ -610,6 +787,8 @@ class ChatSummary(commands.Cog):
             if current_chunk:
                 summary_chunks.append(current_chunk)
 
+            debug_print(f"Split summary into {len(summary_chunks)} chunks")
+
         # Send the first embed with the header
         first_embed = discord.Embed(
             title=f"📊 Shrnutí chatu",
@@ -621,37 +800,53 @@ class ChatSummary(commands.Cog):
         first_embed.timestamp = datetime.now()
 
         try:
+            debug_print(f"Creating DM channel for user {user.name}")
             dm_channel = await user.create_dm()
+            debug_print("Sending first embed with header")
             await dm_channel.send(embed=first_embed)
 
             # Send additional embeds if needed
-            for i, chunk in enumerate(summary_chunks[1:], 1):
-                embed = discord.Embed(
-                    description=chunk,
-                    color=discord.Color.blue()
-                )
+            if len(summary_chunks) > 1:
+                debug_print(f"Sending {len(summary_chunks) - 1} additional embeds")
+                for i, chunk in enumerate(summary_chunks[1:], 1):
+                    embed = discord.Embed(
+                        description=chunk,
+                        color=discord.Color.blue()
+                    )
 
-                await dm_channel.send(embed=embed)
+                    await dm_channel.send(embed=embed)
+                    debug_print(f"Sent chunk {i+1}/{len(summary_chunks)}")
+
+            debug_print(f"Successfully sent all summary chunks to user {user.name}")
         except discord.Forbidden:
             # User has DMs disabled
             print(f"[Summary] Could not send DM to {user.display_name} - DMs disabled")
+            debug_print(f"Failed to send DM to user {user.name} - DMs disabled")
         except Exception as e:
             print(f"[Summary] Error sending summary DM: {e}")
+            debug_print(f"Error sending summary DM: {str(e)}")
+            debug_print(f"Exception type: {type(e).__name__}")
+            debug_print(f"Exception traceback: {traceback.format_exc()}")
 
     @commands.command(name="pocetzpravzaden")
     @commands.has_permissions(administrator=True)
     async def message_count_today(self, ctx):
         """Zobrazí počet zpráv v sumarizačním chatu za dnešní den (admin only)"""
+        debug_print(f"Command pocetzpravzaden executed by {ctx.author.name} (ID: {ctx.author.id})")
+
         # Get today's date
         today = datetime.now().strftime("%Y-%m-%d")
+        debug_print(f"Getting message count for today: {today}")
 
         # Get messages from today
         try:
             messages = chat_db.get_messages_by_date(today)
             message_count = len(messages)
+            debug_print(f"Retrieved {message_count} messages for today")
 
             # Format date for display (YYYY-MM-DD to DD/MM/YYYY)
             display_date = f"{today[8:10]}/{today[5:7]}/{today[0:4]}"
+            debug_print(f"Formatted date for display: {display_date}")
 
             # Create embed
             embed = discord.Embed(
@@ -662,39 +857,53 @@ class ChatSummary(commands.Cog):
 
             embed.set_footer(text=f"Kanál: {CHAT_ID}")
             embed.timestamp = datetime.now()
+            debug_print("Created embed with message count statistics")
 
             await ctx.send(embed=embed, ephemeral=True)
+            debug_print("Sent message count statistics to user")
 
         except Exception as e:
             print(f"[Summary] Error getting message count for today: {e}")
+            debug_print(f"Error getting message count for today: {str(e)}")
+            debug_print(f"Exception type: {type(e).__name__}")
+            debug_print(f"Exception traceback: {traceback.format_exc()}")
             await ctx.send(f"Chyba při získávání počtu zpráv: {e}", ephemeral=True)
 
     @user_summary.error
     async def user_summary_error(self, ctx, error):
         """Handle errors for the user_summary command"""
+        debug_print(f"Error in user_summary command: {str(error)}")
+        debug_print(f"Error type: {type(error).__name__}")
+
         if isinstance(error, CommandOnCooldown):
             minutes, seconds = divmod(int(error.retry_after), 60)
             hours, minutes = divmod(minutes, 60)
+            debug_print(f"Command on cooldown. Retry after: {hours}h {minutes}m {seconds}s")
 
             if hours > 0:
-                await ctx.send(
+                message = (
                     f"Tento příkaz můžeš použít pouze jednou za {SUMMARY_COOLDOWN_HOURS} hodin. "
-                    f"Zkus to znovu za {hours} hodin a {minutes} minut.",
-                    ephemeral=True
+                    f"Zkus to znovu za {hours} hodin a {minutes} minut."
                 )
+                await ctx.send(message, ephemeral=True)
+                debug_print(f"Sent cooldown message (hours): {message}")
             elif minutes > 0:
-                await ctx.send(
+                message = (
                     f"Tento příkaz můžeš použít pouze jednou za {SUMMARY_COOLDOWN_HOURS} hodin. "
-                    f"Zkus to znovu za {minutes} minut a {seconds} sekund.",
-                    ephemeral=True
+                    f"Zkus to znovu za {minutes} minut a {seconds} sekund."
                 )
+                await ctx.send(message, ephemeral=True)
+                debug_print(f"Sent cooldown message (minutes): {message}")
             else:
-                await ctx.send(
+                message = (
                     f"Tento příkaz můžeš použít pouze jednou za {SUMMARY_COOLDOWN_HOURS} hodin. "
-                    f"Zkus to znovu za {seconds} sekund.",
-                    ephemeral=True
+                    f"Zkus to znovu za {seconds} sekund."
                 )
+                await ctx.send(message, ephemeral=True)
+                debug_print(f"Sent cooldown message (seconds): {message}")
         else:
+            debug_print(f"Unhandled error: {str(error)}")
+            debug_print(f"Exception traceback: {traceback.format_exc()}")
             await ctx.send(f"Nastala chyba: {error}", ephemeral=True)
 
 async def setup(bot):
