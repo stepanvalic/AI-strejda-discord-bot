@@ -275,8 +275,7 @@ class ChatSummary(commands.Cog):
         use_openrouter = False
 
         if SUMMARY_API_PROVIDER.lower() == 'deepseek':
-            # Use DeepSeek API (kompatibilní s OpenAI API formátem)
-            # Model 'deepseek-chat' odpovídá DeepSeek-V3, 'deepseek-reasoner' odpovídá DeepSeek-R1
+            # Use DeepSeek API
             if not DEEPSEEK_API_KEY:
                 print("[Summary] DeepSeek API key is missing in environment variables")
                 debug_print("DeepSeek API key is missing in environment variables")
@@ -302,7 +301,7 @@ class ChatSummary(commands.Cog):
 
             if not use_openrouter:
                 print(f"[Summary] Generating summary for {date} with {len(messages)} messages using DeepSeek model {DEEPSEEK_MODEL}")
-                debug_print(f"Using DeepSeek API with model {DEEPSEEK_MODEL} (DeepSeek-V3 pro 'deepseek-chat', DeepSeek-R1 pro 'deepseek-reasoner')")
+                debug_print(f"Using DeepSeek API with model {DEEPSEEK_MODEL}")
 
                 try:
                     async with aiohttp.ClientSession() as session:
@@ -320,13 +319,10 @@ class ChatSummary(commands.Cog):
                         }
 
                         debug_print(f"DeepSeek API request payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
-                        debug_print(f"Sending request to DeepSeek API: https://api.deepseek.com/v1/chat/completions")
+                        debug_print(f"Sending request to DeepSeek API: https://api.deepseek.com/chat/completions")
 
-                        # DeepSeek API používá formát kompatibilní s OpenAI API
-                        # Můžeme použít buď https://api.deepseek.com nebo https://api.deepseek.com/v1
-                        # Model 'deepseek-chat' odpovídá DeepSeek-V3, 'deepseek-reasoner' odpovídá DeepSeek-R1
                         async with session.post(
-                            "https://api.deepseek.com/v1/chat/completions",
+                            "https://api.deepseek.com/chat/completions",
                             headers=headers,
                             json=payload
                         ) as response:
