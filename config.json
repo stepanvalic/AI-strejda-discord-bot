@@ -15,7 +15,7 @@
     "COUNTING_TOPIC_PREFIX": "Počítejte od 1 do nekonečna. Další číslo:",
 
     "AI_MODEL": "gemini-2.0-flash",
-    "AI_MESSAGES_BATCH": 15,
+    "AI_MESSAGES_BATCH": 5,
     "AI_MODERATION_SAVE_FILE": "db/ai_moderation.json",
     "AI_MODERATION_INTERVAL_MINUTES": 30,
     "AI_POSITIVE_THRESHOLD_1": 700,
@@ -42,5 +42,5 @@
     "LOG_LEVEL": "INFO",
     "LOG_MAX_SIZE": 5242880,
     "LOG_BACKUP_COUNT": 10,
-    "SUMMARY_DEBUG": true
+    "SUMMARY_DEBUG": false
 }
