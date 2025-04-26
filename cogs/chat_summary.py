@@ -169,6 +169,12 @@ class ChatSummary(commands.Cog):
         await self.bot.wait_until_ready()
 
     async def generate_summary(self, messages, date):
+        print("[Summary] generate_summary function called")
+        print(f"[Summary] Date: {date}")
+        print(f"[Summary] Number of messages: {len(messages)}")
+        print(f"[Summary] API Provider: {SUMMARY_API_PROVIDER}")
+        print(f"[Summary] DeepSeek API Key: {DEEPSEEK_API_KEY[:4]}...{DEEPSEEK_API_KEY[-4:] if DEEPSEEK_API_KEY else 'None'}")
+        print(f"[Summary] DeepSeek Model: {DEEPSEEK_MODEL}")
         """Generate a summary of the messages using either OpenRouter or DeepSeek API"""
         # Prepare messages for the API
         message_texts = []
