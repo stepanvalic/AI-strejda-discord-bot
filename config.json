@@ -32,7 +32,7 @@
 
     "AUDIT_LOG_CHANNEL_ID": 1362167228358856865,
 
-    "SUMMARY_API_PROVIDER": "openrouter",
+    "SUMMARY_API_PROVIDER": "deepseek",
     "OPENROUTER_MODEL": "deepseek/deepseek-chat-v3-0324:free",
     "DEEPSEEK_MODEL": "deepseek-chat",
     "SUMMARY_CHAT_ID": 1359910160277045341,
