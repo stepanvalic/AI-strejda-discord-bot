@@ -5,7 +5,7 @@ import asyncio
 import datetime
 import google.generativeai as genai
 from discord.ext import commands, tasks
-from utils import config
+from utils import config, token_tracker
 
 # Load configuration
 GEMINI_API_KEY = config.get('GEMINI_API_KEY')
@@ -271,6 +271,10 @@ Provide your analysis in the following JSON format:
             )
 
             print("[AI Mod] Received response from Gemini API")
+
+            # Sledování využití tokenů
+            token_tracker.extract_tokens_from_gemini_response(response, "moderation", prompt_text=combined_text)
+
             # Parse the response
             if response.text:
                 try:

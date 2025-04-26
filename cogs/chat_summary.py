@@ -6,7 +6,7 @@ import aiohttp
 import asyncio
 import traceback
 from datetime import datetime, time, timedelta
-from utils import chat_db, config
+from utils import chat_db, config, token_tracker
 from discord.ext.commands import CommandOnCooldown, BucketType
 
 # Load configuration
@@ -323,6 +323,9 @@ class ChatSummary(commands.Cog):
                                 data = await response.json()
                                 debug_print(f"DeepSeek API response: {json.dumps(data, ensure_ascii=False, indent=2)}")
 
+                                # Sledování využití tokenů
+                                token_tracker.extract_tokens_from_deepseek_response(data, "summary")
+
                                 if not data.get("choices") or not data["choices"][0].get("message"):
                                     print(f"[Summary] Invalid response from DeepSeek API: {data}")
                                     debug_print(f"Invalid response structure from DeepSeek API: {data}")
@@ -397,6 +400,9 @@ class ChatSummary(commands.Cog):
 
                         data = await response.json()
                         debug_print(f"OpenRouter API response: {json.dumps(data, ensure_ascii=False, indent=2)}")
+
+                        # Sledování využití tokenů
+                        token_tracker.extract_tokens_from_openrouter_response(data, "summary")
 
                         if not data.get("choices") or not data["choices"][0].get("message"):
                             print(f"[Summary] Invalid response from OpenRouter API: {data}")
