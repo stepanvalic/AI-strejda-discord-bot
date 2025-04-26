@@ -8,6 +8,7 @@ import traceback
 from datetime import datetime, time, timedelta
 from utils import chat_db, config, token_tracker
 from discord.ext.commands import CommandOnCooldown, BucketType
+from openai import OpenAI
 
 # Load configuration
 CHAT_ID = config.get_int('SUMMARY_CHAT_ID')
@@ -304,61 +305,45 @@ class ChatSummary(commands.Cog):
                 debug_print(f"Using DeepSeek API with model {DEEPSEEK_MODEL}")
 
                 try:
-                    async with aiohttp.ClientSession() as session:
-                        headers = {
-                            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-                            "Content-Type": "application/json"
-                        }
+                    # Použití OpenAI SDK pro volání DeepSeek API
+                    debug_print(f"Using OpenAI SDK to call DeepSeek API with model {DEEPSEEK_MODEL}")
 
-                        payload = {
-                            "model": DEEPSEEK_MODEL,
-                            "messages": [
-                                {"role": "system", "content": system_prompt},
-                                {"role": "user", "content": user_prompt}
-                            ]
-                        }
+                    # Inicializace klienta OpenAI s DeepSeek API
+                    client = OpenAI(
+                        api_key=DEEPSEEK_API_KEY,
+                        base_url="https://api.deepseek.com/v1"  # Můžeme použít i "https://api.deepseek.com"
+                    )
 
-                        debug_print(f"DeepSeek API request payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
-                        debug_print(f"Sending request to DeepSeek API: https://api.deepseek.com/chat/completions")
+                    # Příprava zpráv pro API
+                    messages = [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ]
 
-                        async with session.post(
-                            "https://api.deepseek.com/chat/completions",
-                            headers=headers,
-                            json=payload
-                        ) as response:
-                            if response.status != 200:
-                                error_text = await response.text()
-                                print(f"[Summary] DeepSeek API error: {response.status} - {error_text}")
-                                debug_print(f"DeepSeek API error response: {error_text}")
+                    debug_print(f"DeepSeek API request messages: {json.dumps(messages, ensure_ascii=False, indent=2)}")
+                    debug_print(f"Sending request to DeepSeek API using OpenAI SDK")
 
-                                # Try to fallback to OpenRouter if available
-                                if OPENROUTER_API_KEY and OPENROUTER_MODEL:
-                                    print("[Summary] Falling back to OpenRouter API after DeepSeek API error")
-                                    debug_print("Falling back to OpenRouter API after DeepSeek API error")
-                                    use_openrouter = True
-                                else:
-                                    return None
-                            else:
-                                data = await response.json()
-                                debug_print(f"DeepSeek API response: {json.dumps(data, ensure_ascii=False, indent=2)}")
+                    # Odeslání požadavku na API
+                    response = await asyncio.to_thread(
+                        client.chat.completions.create,
+                        model=DEEPSEEK_MODEL,
+                        messages=messages,
+                        stream=False
+                    )
 
-                                # Sledování využití tokenů
-                                token_tracker.extract_tokens_from_deepseek_response(data, "summary")
+                    # Zpracování odpovědi
+                    debug_print(f"DeepSeek API response received")
 
-                                if not data.get("choices") or not data["choices"][0].get("message"):
-                                    print(f"[Summary] Invalid response from DeepSeek API: {data}")
-                                    debug_print(f"Invalid response structure from DeepSeek API: {data}")
+                    # Převod odpovědi na slovník pro token tracker
+                    response_dict = response.model_dump()
+                    debug_print(f"DeepSeek API response: {json.dumps(response_dict, ensure_ascii=False, indent=2)}")
 
-                                    # Try to fallback to OpenRouter if available
-                                    if OPENROUTER_API_KEY and OPENROUTER_MODEL:
-                                        print("[Summary] Falling back to OpenRouter API after invalid DeepSeek response")
-                                        debug_print("Falling back to OpenRouter API after invalid DeepSeek response")
-                                        use_openrouter = True
-                                    else:
-                                        return None
-                                else:
-                                    summary = data["choices"][0]["message"]["content"]
-                                    debug_print(f"DeepSeek API summary (first 500 chars): {summary[:500]}...")
+                    # Sledování využití tokenů
+                    token_tracker.extract_tokens_from_deepseek_response(response_dict, "summary")
+
+                    # Získání obsahu odpovědi
+                    summary = response.choices[0].message.content
+                    debug_print(f"DeepSeek API summary (first 500 chars): {summary[:500]}...")
                 except Exception as e:
                     print(f"[Summary] Error calling DeepSeek API: {e}")
                     debug_print(f"Exception when calling DeepSeek API: {str(e)}")
