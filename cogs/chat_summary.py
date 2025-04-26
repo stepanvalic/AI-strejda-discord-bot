@@ -306,15 +306,18 @@ class ChatSummary(commands.Cog):
 
                 try:
                     # Použití OpenAI SDK pro volání DeepSeek API
+                    print(f"[Summary] Using OpenAI SDK to call DeepSeek API with model {DEEPSEEK_MODEL}")
                     debug_print(f"Using OpenAI SDK to call DeepSeek API with model {DEEPSEEK_MODEL}")
 
                     # Inicializace klienta OpenAI s DeepSeek API
+                    print(f"[Summary] Initializing OpenAI client with DeepSeek API base URL")
                     client = OpenAI(
                         api_key=DEEPSEEK_API_KEY,
                         base_url="https://api.deepseek.com/v1"  # Můžeme použít i "https://api.deepseek.com"
                     )
 
                     # Příprava zpráv pro API
+                    print(f"[Summary] Preparing messages for DeepSeek API")
                     messages = [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt}
@@ -324,6 +327,7 @@ class ChatSummary(commands.Cog):
                     debug_print(f"Sending request to DeepSeek API using OpenAI SDK")
 
                     # Odeslání požadavku na API
+                    print(f"[Summary] Sending request to DeepSeek API using OpenAI SDK")
                     response = await asyncio.to_thread(
                         client.chat.completions.create,
                         model=DEEPSEEK_MODEL,
@@ -332,20 +336,27 @@ class ChatSummary(commands.Cog):
                     )
 
                     # Zpracování odpovědi
+                    print(f"[Summary] DeepSeek API response received successfully")
                     debug_print(f"DeepSeek API response received")
 
                     # Převod odpovědi na slovník pro token tracker
+                    print(f"[Summary] Converting response to dictionary for token tracking")
                     response_dict = response.model_dump()
                     debug_print(f"DeepSeek API response: {json.dumps(response_dict, ensure_ascii=False, indent=2)}")
 
                     # Sledování využití tokenů
+                    print(f"[Summary] Tracking token usage from DeepSeek API response")
                     token_tracker.extract_tokens_from_deepseek_response(response_dict, "summary")
 
                     # Získání obsahu odpovědi
+                    print(f"[Summary] Extracting content from DeepSeek API response")
                     summary = response.choices[0].message.content
+                    print(f"[Summary] Successfully generated summary with DeepSeek API (length: {len(summary)} chars)")
                     debug_print(f"DeepSeek API summary (first 500 chars): {summary[:500]}...")
                 except Exception as e:
                     print(f"[Summary] Error calling DeepSeek API: {e}")
+                    print(f"[Summary] Exception type: {type(e).__name__}")
+                    print(f"[Summary] Exception traceback: {traceback.format_exc()}")
                     debug_print(f"Exception when calling DeepSeek API: {str(e)}")
                     debug_print(f"Exception type: {type(e).__name__}")
                     debug_print(f"Exception traceback: {traceback.format_exc()}")
@@ -356,6 +367,7 @@ class ChatSummary(commands.Cog):
                         debug_print("Falling back to OpenRouter API after DeepSeek API exception")
                         use_openrouter = True
                     else:
+                        print("[Summary] No fallback available, returning None")
                         return None
 
         if SUMMARY_API_PROVIDER.lower() == 'openrouter' or use_openrouter:
@@ -738,6 +750,7 @@ class ChatSummary(commands.Cog):
 
         try:
             # Get the latest messages
+            print(f"[Summary] Retrieving latest {count} messages for user {ctx.author.display_name}")
             debug_print(f"Retrieving latest {count} messages")
             messages = chat_db.get_latest_messages(count)
             print(f"[Summary] User summary: Found {len(messages)} messages for user {ctx.author.display_name}")
@@ -753,16 +766,19 @@ class ChatSummary(commands.Cog):
                     debug_print(f"  Message {i+1}: {username}: {content[:100]}...")
 
             if not messages:
+                print(f"[Summary] No messages found for user {ctx.author.display_name}, command cancelled")
                 await ctx.send("Nenalezeny žádné zprávy k sumarizaci.", ephemeral=True)
                 debug_print("No messages found, command cancelled")
                 return
 
             # Generate summary
             current_date = datetime.now().strftime("%Y-%m-%d")
+            print(f"[Summary] User {ctx.author.name} requested summary for {len(messages)} messages")
             debug_print(f"Generating summary for {len(messages)} messages with date {current_date}")
             summary = await self.generate_summary(messages, current_date)
 
             if not summary:
+                print(f"[Summary] Failed to generate summary for user {ctx.author.name}")
                 await ctx.send("Nepodařilo se vygenerovat shrnutí.", ephemeral=True)
                 debug_print("Failed to generate summary")
                 return
@@ -794,12 +810,15 @@ class ChatSummary(commands.Cog):
             debug_print(f"Created summary data: {json.dumps(summary_data, ensure_ascii=False, default=str)[:500]}...")
 
             # Send summary to user via DM
+            print(f"[Summary] Sending summary to user {ctx.author.name} via DM")
             debug_print(f"Sending summary to user {ctx.author.name} via DM")
             await self.send_summary_dm(ctx.author, summary_data)
+            print(f"[Summary] Summary sent to user {ctx.author.name}'s DM successfully")
             debug_print("Summary sent to user's DM successfully")
 
             # Confirm to the user
             await ctx.send("Shrnutí bylo vygenerováno a posláno do tvých soukromých zpráv.", ephemeral=True)
+            print(f"[Summary] Command completed successfully for user {ctx.author.name}")
             debug_print(f"Command completed successfully for user {ctx.author.name}")
 
         except Exception as e:
@@ -812,11 +831,13 @@ class ChatSummary(commands.Cog):
 
     async def send_summary_dm(self, user, summary_data):
         """Send the summary to a user via DM"""
+        print(f"[Summary] Preparing to send summary DM to user {user.name} (ID: {user.id})")
         debug_print(f"Preparing to send summary DM to user {user.name} (ID: {user.id})")
 
         # Create embed
         message_count = summary_data.get("message_count", 0)
         summary = summary_data.get("summary", "No summary available")
+        print(f"[Summary] Preparing DM with summary length: {len(summary)} characters, message count: {message_count}")
         debug_print(f"Summary length: {len(summary)} characters, message count: {message_count}")
 
         # Split summary into chunks if it's too long
@@ -871,13 +892,16 @@ class ChatSummary(commands.Cog):
         first_embed.timestamp = datetime.now()
 
         try:
+            print(f"[Summary] Creating DM channel for user {user.name}")
             debug_print(f"Creating DM channel for user {user.name}")
             dm_channel = await user.create_dm()
+            print(f"[Summary] Sending first embed with header to user {user.name}")
             debug_print("Sending first embed with header")
             await dm_channel.send(embed=first_embed)
 
             # Send additional embeds if needed
             if len(summary_chunks) > 1:
+                print(f"[Summary] Sending {len(summary_chunks) - 1} additional embeds to user {user.name}")
                 debug_print(f"Sending {len(summary_chunks) - 1} additional embeds")
                 for i, chunk in enumerate(summary_chunks[1:], 1):
                     embed = discord.Embed(
@@ -886,8 +910,10 @@ class ChatSummary(commands.Cog):
                     )
 
                     await dm_channel.send(embed=embed)
+                    print(f"[Summary] Sent chunk {i+1}/{len(summary_chunks)} to user {user.name}")
                     debug_print(f"Sent chunk {i+1}/{len(summary_chunks)}")
 
+            print(f"[Summary] Successfully sent all summary chunks to user {user.name}")
             debug_print(f"Successfully sent all summary chunks to user {user.name}")
         except discord.Forbidden:
             # User has DMs disabled
@@ -895,6 +921,8 @@ class ChatSummary(commands.Cog):
             debug_print(f"Failed to send DM to user {user.name} - DMs disabled")
         except Exception as e:
             print(f"[Summary] Error sending summary DM: {e}")
+            print(f"[Summary] Exception type: {type(e).__name__}")
+            print(f"[Summary] Exception traceback: {traceback.format_exc()}")
             debug_print(f"Error sending summary DM: {str(e)}")
             debug_print(f"Exception type: {type(e).__name__}")
             debug_print(f"Exception traceback: {traceback.format_exc()}")
