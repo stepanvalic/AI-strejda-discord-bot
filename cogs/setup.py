@@ -16,7 +16,7 @@ SUMMARY_CHANNEL_ID = config.get_int('SUMMARY_CHANNEL_ID')
 
 def set_env_value(file_path, key, value):
     # Check if this is a sensitive key that should be in .env
-    sensitive_keys = ['DISCORD_TOKEN', 'YOUTUBE_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY']
+    sensitive_keys = ['DISCORD_TOKEN', 'YOUTUBE_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'DEEPSEEK_API_KEY']
 
     if key in sensitive_keys:
         # Update .env file for sensitive keys
@@ -190,7 +190,8 @@ class Setup(commands.Cog):
                   "- DISCORD_TOKEN\n"
                   "- YOUTUBE_API_KEY\n"
                   "- GEMINI_API_KEY\n"
-                  "- OPENROUTER_API_KEY"
+                  "- OPENROUTER_API_KEY\n"
+                  "- DEEPSEEK_API_KEY"
         )
 
         await ctx.send(embed=embed, ephemeral=True)

@@ -509,7 +509,7 @@ class AuditLog(commands.Cog):
     def update_env_file(self, key, value):
         """Aktualizuje hodnotu v konfiguraci"""
         # Check if this is a sensitive key that should be in .env
-        sensitive_keys = ['DISCORD_TOKEN', 'YOUTUBE_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY']
+        sensitive_keys = ['DISCORD_TOKEN', 'YOUTUBE_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'DEEPSEEK_API_KEY']
 
         if key in sensitive_keys:
             # Update .env file for sensitive keys

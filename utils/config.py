@@ -14,7 +14,7 @@ _config = {}
 def load_config():
     """Load configuration from config.json and .env files"""
     global _config
-    
+
     # Load configuration from config.json
     try:
         with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
@@ -22,15 +22,16 @@ def load_config():
     except (FileNotFoundError, json.JSONDecodeError) as e:
         print(f"Error loading config.json: {e}")
         _config = {}
-    
+
     # Add sensitive keys from .env
     sensitive_keys = [
         'DISCORD_TOKEN',
         'YOUTUBE_API_KEY',
         'GEMINI_API_KEY',
-        'OPENROUTER_API_KEY'
+        'OPENROUTER_API_KEY',
+        'DEEPSEEK_API_KEY'
     ]
-    
+
     for key in sensitive_keys:
         value = os.getenv(key)
         if value:
@@ -76,11 +77,12 @@ def save():
         'DISCORD_TOKEN',
         'YOUTUBE_API_KEY',
         'GEMINI_API_KEY',
-        'OPENROUTER_API_KEY'
+        'OPENROUTER_API_KEY',
+        'DEEPSEEK_API_KEY'
     ]
-    
+
     save_config = {k: v for k, v in _config.items() if k not in sensitive_keys}
-    
+
     try:
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(save_config, f, indent=4)

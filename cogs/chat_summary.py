@@ -11,8 +11,11 @@ from discord.ext.commands import CommandOnCooldown, BucketType
 # Load configuration
 CHAT_ID = config.get_int('SUMMARY_CHAT_ID', 0)
 SUMMARY_CHANNEL_ID = config.get_int('SUMMARY_CHANNEL_ID', 0)
+SUMMARY_API_PROVIDER = config.get('SUMMARY_API_PROVIDER', '')
 OPENROUTER_API_KEY = config.get('OPENROUTER_API_KEY', '')
 OPENROUTER_MODEL = config.get('OPENROUTER_MODEL', '')
+DEEPSEEK_API_KEY = config.get('DEEPSEEK_API_KEY', '')
+DEEPSEEK_MODEL = config.get('DEEPSEEK_MODEL', 'deepseek-chat')
 SUMMARY_COOLDOWN_HOURS = config.get_int('SUMMARY_COOLDOWN_HOURS', 6)
 
 class ChatSummary(commands.Cog):
@@ -135,17 +138,7 @@ class ChatSummary(commands.Cog):
         await self.bot.wait_until_ready()
 
     async def generate_summary(self, messages, date):
-        """Generate a summary of the messages using OpenRouter API"""
-        if not OPENROUTER_API_KEY:
-            print("[Summary] OpenRouter API key is missing")
-            return None
-
-        if not OPENROUTER_MODEL:
-            print("[Summary] OpenRouter model is not specified")
-            return None
-
-        print(f"[Summary] Generating summary for {date} with {len(messages)} messages using model {OPENROUTER_MODEL}")
-
+        """Generate a summary of the messages using either OpenRouter or DeepSeek API"""
         # Prepare messages for the API
         message_texts = []
         message_map = {}  # Map to store message IDs for reference
@@ -206,61 +199,116 @@ class ChatSummary(commands.Cog):
             f"{all_messages}"
         )
 
-        # Call OpenRouter API
-        try:
-            async with aiohttp.ClientSession() as session:
-                headers = {
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json"
-                }
+        # Choose API provider based on configuration
+        if SUMMARY_API_PROVIDER.lower() == 'deepseek':
+            # Use DeepSeek API
+            if not DEEPSEEK_API_KEY:
+                print("[Summary] DeepSeek API key is missing")
+                return None
 
-                payload = {
-                    "model": OPENROUTER_MODEL,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ]
-                }
+            print(f"[Summary] Generating summary for {date} with {len(messages)} messages using DeepSeek model {DEEPSEEK_MODEL}")
 
-                async with session.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers=headers,
-                    json=payload
-                ) as response:
-                    if response.status != 200:
-                        error_text = await response.text()
-                        print(f"[Summary] OpenRouter API error: {response.status} - {error_text}")
-                        return None
+            try:
+                async with aiohttp.ClientSession() as session:
+                    headers = {
+                        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                        "Content-Type": "application/json"
+                    }
 
-                    data = await response.json()
+                    payload = {
+                        "model": DEEPSEEK_MODEL,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ]
+                    }
 
-                    if not data.get("choices") or not data["choices"][0].get("message"):
-                        print(f"[Summary] Invalid response from OpenRouter API: {data}")
-                        return None
+                    async with session.post(
+                        "https://api.deepseek.com/chat/completions",
+                        headers=headers,
+                        json=payload
+                    ) as response:
+                        if response.status != 200:
+                            error_text = await response.text()
+                            print(f"[Summary] DeepSeek API error: {response.status} - {error_text}")
+                            return None
 
-                    summary = data["choices"][0]["message"]["content"]
+                        data = await response.json()
 
-                    # Process the summary to replace TOPIC_START markers with actual message links
-                    import re
-                    topic_start_pattern = r'\[TOPIC_START:(\d+)\]'
+                        if not data.get("choices") or not data["choices"][0].get("message"):
+                            print(f"[Summary] Invalid response from DeepSeek API: {data}")
+                            return None
 
-                    def replace_topic_start(match):
-                        index = int(match.group(1))
-                        if index in message_map:
-                            msg_info = message_map[index]
-                            message_id = msg_info["message_id"]
-                            channel_id = msg_info["channel_id"]
-                            # Format for clickable message link in Discord using [tema](url) format
-                            url = f"https://discord.com/channels/{config.get_int('GUILD_ID')}/{channel_id}/{message_id}"
-                            return f"[téma]({url})"
-                        return ""
+                        summary = data["choices"][0]["message"]["content"]
+            except Exception as e:
+                print(f"[Summary] Error calling DeepSeek API: {e}")
+                return None
 
-                    processed_summary = re.sub(topic_start_pattern, replace_topic_start, summary)
-                    return processed_summary
+        else:
+            # Use OpenRouter API (default)
+            if not OPENROUTER_API_KEY:
+                print("[Summary] OpenRouter API key is missing")
+                return None
 
-        except Exception as e:
-            print(f"[Summary] Error calling OpenRouter API: {e}")
-            return None
+            if not OPENROUTER_MODEL:
+                print("[Summary] OpenRouter model is not specified")
+                return None
+
+            print(f"[Summary] Generating summary for {date} with {len(messages)} messages using OpenRouter model {OPENROUTER_MODEL}")
+
+            try:
+                async with aiohttp.ClientSession() as session:
+                    headers = {
+                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                        "Content-Type": "application/json"
+                    }
+
+                    payload = {
+                        "model": OPENROUTER_MODEL,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ]
+                    }
+
+                    async with session.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=headers,
+                        json=payload
+                    ) as response:
+                        if response.status != 200:
+                            error_text = await response.text()
+                            print(f"[Summary] OpenRouter API error: {response.status} - {error_text}")
+                            return None
+
+                        data = await response.json()
+
+                        if not data.get("choices") or not data["choices"][0].get("message"):
+                            print(f"[Summary] Invalid response from OpenRouter API: {data}")
+                            return None
+
+                        summary = data["choices"][0]["message"]["content"]
+            except Exception as e:
+                print(f"[Summary] Error calling OpenRouter API: {e}")
+                return None
+
+        # Process the summary to replace TOPIC_START markers with actual message links
+        import re
+        topic_start_pattern = r'\[TOPIC_START:(\d+)\]'
+
+        def replace_topic_start(match):
+            index = int(match.group(1))
+            if index in message_map:
+                msg_info = message_map[index]
+                message_id = msg_info["message_id"]
+                channel_id = msg_info["channel_id"]
+                # Format for clickable message link in Discord using [tema](url) format
+                url = f"https://discord.com/channels/{config.get_int('GUILD_ID')}/{channel_id}/{message_id}"
+                return f"[téma]({url})"
+            return ""
+
+        processed_summary = re.sub(topic_start_pattern, replace_topic_start, summary)
+        return processed_summary
 
     async def send_summary(self, summary_data, channel_id=None):
         """Send the summary to the designated channel or a specific channel"""
