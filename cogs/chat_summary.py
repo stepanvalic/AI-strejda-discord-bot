@@ -19,12 +19,8 @@ OPENROUTER_MODEL = config.get('OPENROUTER_MODEL')
 DEEPSEEK_API_KEY = config.get('DEEPSEEK_API_KEY')
 DEEPSEEK_MODEL = config.get('DEEPSEEK_MODEL')
 SUMMARY_COOLDOWN_HOURS = config.get_int('SUMMARY_COOLDOWN_HOURS')
-SUMMARY_DEBUG = config.get_bool('SUMMARY_DEBUG')
 
-def debug_print(*args, **kwargs):
-    """Print debug messages only if SUMMARY_DEBUG is enabled"""
-    if SUMMARY_DEBUG:
-        print("[Summary Debug]", *args, **kwargs)
+debug_print = print  # Remove debug_print function
 
 class ChatSummary(commands.Cog):
     def __init__(self, bot):
