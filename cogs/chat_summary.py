@@ -10,15 +10,15 @@ from utils import chat_db, config
 from discord.ext.commands import CommandOnCooldown, BucketType
 
 # Load configuration
-CHAT_ID = config.get_int('SUMMARY_CHAT_ID', 0)
-SUMMARY_CHANNEL_ID = config.get_int('SUMMARY_CHANNEL_ID', 0)
-SUMMARY_API_PROVIDER = config.get('SUMMARY_API_PROVIDER', '')
-OPENROUTER_API_KEY = config.get('OPENROUTER_API_KEY', '')
-OPENROUTER_MODEL = config.get('OPENROUTER_MODEL', '')
-DEEPSEEK_API_KEY = config.get('DEEPSEEK_API_KEY', '')
-DEEPSEEK_MODEL = config.get('DEEPSEEK_MODEL', 'deepseek-chat')
-SUMMARY_COOLDOWN_HOURS = config.get_int('SUMMARY_COOLDOWN_HOURS', 6)
-SUMMARY_DEBUG = config.get_bool('SUMMARY_DEBUG', False)
+CHAT_ID = config.get_int('SUMMARY_CHAT_ID')
+SUMMARY_CHANNEL_ID = config.get_int('SUMMARY_CHANNEL_ID')
+SUMMARY_API_PROVIDER = config.get('SUMMARY_API_PROVIDER')
+OPENROUTER_API_KEY = config.get('OPENROUTER_API_KEY')
+OPENROUTER_MODEL = config.get('OPENROUTER_MODEL')
+DEEPSEEK_API_KEY = config.get('DEEPSEEK_API_KEY')
+DEEPSEEK_MODEL = config.get('DEEPSEEK_MODEL')
+SUMMARY_COOLDOWN_HOURS = config.get_int('SUMMARY_COOLDOWN_HOURS')
+SUMMARY_DEBUG = config.get_bool('SUMMARY_DEBUG')
 
 def debug_print(*args, **kwargs):
     """Print debug messages only if SUMMARY_DEBUG is enabled"""
@@ -246,10 +246,23 @@ class ChatSummary(commands.Cog):
         debug_print(f"User prompt (first 500 chars): {user_prompt[:500]}...")
 
         # Choose API provider based on configuration
+        if not SUMMARY_API_PROVIDER:
+            print("[Summary] API provider not specified in configuration")
+            debug_print("API provider not specified in configuration")
+            return None
+
+        debug_print(f"API provider from config: {SUMMARY_API_PROVIDER}")
+
         if SUMMARY_API_PROVIDER.lower() == 'deepseek':
             # Use DeepSeek API
             if not DEEPSEEK_API_KEY:
                 print("[Summary] DeepSeek API key is missing")
+                debug_print("DeepSeek API key is missing in environment variables")
+                return None
+
+            if not DEEPSEEK_MODEL:
+                print("[Summary] DeepSeek model is not specified")
+                debug_print("DeepSeek model is not specified in configuration")
                 return None
 
             print(f"[Summary] Generating summary for {date} with {len(messages)} messages using DeepSeek model {DEEPSEEK_MODEL}")
@@ -289,6 +302,7 @@ class ChatSummary(commands.Cog):
 
                         if not data.get("choices") or not data["choices"][0].get("message"):
                             print(f"[Summary] Invalid response from DeepSeek API: {data}")
+                            debug_print(f"Invalid response structure from DeepSeek API: {data}")
                             return None
 
                         summary = data["choices"][0]["message"]["content"]
@@ -300,14 +314,16 @@ class ChatSummary(commands.Cog):
                 debug_print(f"Exception traceback: {traceback.format_exc()}")
                 return None
 
-        else:
-            # Use OpenRouter API (default)
+        elif SUMMARY_API_PROVIDER.lower() == 'openrouter':
+            # Use OpenRouter API
             if not OPENROUTER_API_KEY:
                 print("[Summary] OpenRouter API key is missing")
+                debug_print("OpenRouter API key is missing in environment variables")
                 return None
 
             if not OPENROUTER_MODEL:
                 print("[Summary] OpenRouter model is not specified")
+                debug_print("OpenRouter model is not specified in configuration")
                 return None
 
             print(f"[Summary] Generating summary for {date} with {len(messages)} messages using OpenRouter model {OPENROUTER_MODEL}")
@@ -347,6 +363,7 @@ class ChatSummary(commands.Cog):
 
                         if not data.get("choices") or not data["choices"][0].get("message"):
                             print(f"[Summary] Invalid response from OpenRouter API: {data}")
+                            debug_print(f"Invalid response structure from OpenRouter API: {data}")
                             return None
 
                         summary = data["choices"][0]["message"]["content"]
@@ -357,6 +374,11 @@ class ChatSummary(commands.Cog):
                 debug_print(f"Exception type: {type(e).__name__}")
                 debug_print(f"Exception traceback: {traceback.format_exc()}")
                 return None
+        else:
+            print(f"[Summary] Unknown API provider: {SUMMARY_API_PROVIDER}")
+            debug_print(f"Unknown API provider: {SUMMARY_API_PROVIDER}")
+            debug_print(f"Supported providers are 'deepseek' and 'openrouter'")
+            return None
 
         # Process the summary to replace TOPIC_START markers with actual message links
         import re

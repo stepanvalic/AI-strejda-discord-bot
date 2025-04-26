@@ -39,27 +39,42 @@ def load_config():
 
 def get(key, default=None):
     """Get a configuration value"""
-    return _config.get(key, default)
+    if key not in _config:
+        print(f"Warning: Key '{key}' not found in configuration, using default: {default}")
+        return default
+    return _config.get(key)
 
 def get_int(key, default=0):
     """Get a configuration value as an integer"""
+    if key not in _config:
+        print(f"Warning: Key '{key}' not found in configuration, using default: {default}")
+        return default
+
     try:
-        return int(_config.get(key, default))
+        return int(_config.get(key))
     except (ValueError, TypeError):
         print(f"Warning: Invalid integer value for {key} in configuration")
         return default
 
 def get_float(key, default=0.0):
     """Get a configuration value as a float"""
+    if key not in _config:
+        print(f"Warning: Key '{key}' not found in configuration, using default: {default}")
+        return default
+
     try:
-        return float(_config.get(key, default))
+        return float(_config.get(key))
     except (ValueError, TypeError):
         print(f"Warning: Invalid float value for {key} in configuration")
         return default
 
 def get_bool(key, default=False):
     """Get a configuration value as a boolean"""
-    value = _config.get(key, default)
+    if key not in _config:
+        print(f"Warning: Key '{key}' not found in configuration, using default: {default}")
+        return default
+
+    value = _config.get(key)
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
