@@ -162,7 +162,7 @@ class Utility(commands.Cog):
                 youtube_commands[cmd_name] = cmd_desc
             elif command.name in ["count", "countstats", "countrules", "countreset"]:
                 counting_commands[cmd_name] = cmd_desc
-            elif command.name in ["aiscore", "aitop", "aibottom", "airules", "aireset", "airesetall"]:
+            elif command.name in ["aiscore", "aitop", "aibottom", "airules", "aireset", "airesetall", "aicheck"]:
                 ai_commands[cmd_name] = cmd_desc
             elif command.name in ["timeout", "untimeout", "unmute", "ban", "unban"]:
                 moderation_commands[cmd_name] = cmd_desc
