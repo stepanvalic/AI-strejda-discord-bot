@@ -19,6 +19,14 @@ def load_config():
     try:
         with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
             _config = json.load(f)
+
+        # Zajistíme, že boolean hodnoty jsou správně převedeny z JSON na Python
+        # JSON používá true/false, Python používá True/False
+        for key, value in _config.items():
+            if isinstance(value, bool):
+                # Hodnota je už boolean, ale ujistíme se, že je to Python boolean
+                _config[key] = bool(value)
+
     except (FileNotFoundError, json.JSONDecodeError) as e:
         print(f"Error loading config.json: {e}")
         _config = {}
@@ -36,6 +44,11 @@ def load_config():
         value = os.getenv(key)
         if value:
             _config[key] = value
+
+    # Debug výpis pro kontrolu boolean hodnot
+    for key, value in _config.items():
+        if isinstance(value, bool):
+            print(f"Boolean config: {key} = {value} (type: {type(value).__name__})")
 
 def get(key, default=None):
     """Get a configuration value"""
@@ -75,10 +88,19 @@ def get_bool(key, default=False):
         return default
 
     value = _config.get(key)
+
+    # JSON true/false jsou automaticky převedeny na Python True/False při načtení pomocí json.load()
+    # Tato funkce zajišťuje, že hodnoty jsou správně převedeny na Python boolean
+
+    # Pokud je hodnota už boolean, vrátíme ji přímo
     if isinstance(value, bool):
         return value
+
+    # Pokud je hodnota string, zkontrolujeme, zda odpovídá true/yes/1/y
     if isinstance(value, str):
         return value.lower() in ('true', 'yes', '1', 'y')
+
+    # Pro ostatní typy použijeme standardní Python bool()
     return bool(value)
 
 def set(key, value):
@@ -98,9 +120,20 @@ def save():
 
     save_config = {k: v for k, v in _config.items() if k not in sensitive_keys}
 
+    # Ujistíme se, že boolean hodnoty jsou správně převedeny z Python na JSON
+    # Python používá True/False, JSON používá true/false
+    # json.dump() automaticky převede Python True/False na JSON true/false
+
     try:
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(save_config, f, indent=4)
+
+        # Debug výpis pro kontrolu uložených hodnot
+        print("Configuration saved successfully")
+        for key, value in save_config.items():
+            if isinstance(value, bool):
+                print(f"Saved boolean config: {key} = {value}")
+
         return True
     except Exception as e:
         print(f"Error saving config.json: {e}")
