@@ -253,68 +253,105 @@ class ChatSummary(commands.Cog):
 
         debug_print(f"API provider from config: {SUMMARY_API_PROVIDER}")
 
+        use_openrouter = False
+
         if SUMMARY_API_PROVIDER.lower() == 'deepseek':
             # Use DeepSeek API
             if not DEEPSEEK_API_KEY:
-                print("[Summary] DeepSeek API key is missing")
+                print("[Summary] DeepSeek API key is missing in environment variables")
                 debug_print("DeepSeek API key is missing in environment variables")
-                return None
+                debug_print("Please add DEEPSEEK_API_KEY to your .env file")
+                debug_print("Current environment variables:")
+                import os
+                for key in os.environ:
+                    if not key.startswith("DISCORD") and not key.startswith("PATH"):  # Skip sensitive keys
+                        debug_print(f"  {key}: {'*****' if 'KEY' in key or 'TOKEN' in key else os.environ[key]}")
 
-            if not DEEPSEEK_MODEL:
+                # Try to fallback to OpenRouter if available
+                if OPENROUTER_API_KEY and OPENROUTER_MODEL:
+                    print("[Summary] Falling back to OpenRouter API")
+                    debug_print("Falling back to OpenRouter API since DeepSeek API key is missing")
+                    use_openrouter = True
+                else:
+                    return None
+
+            if not DEEPSEEK_MODEL and not use_openrouter:
                 print("[Summary] DeepSeek model is not specified")
                 debug_print("DeepSeek model is not specified in configuration")
                 return None
 
-            print(f"[Summary] Generating summary for {date} with {len(messages)} messages using DeepSeek model {DEEPSEEK_MODEL}")
-            debug_print(f"Using DeepSeek API with model {DEEPSEEK_MODEL}")
+            if not use_openrouter:
+                print(f"[Summary] Generating summary for {date} with {len(messages)} messages using DeepSeek model {DEEPSEEK_MODEL}")
+                debug_print(f"Using DeepSeek API with model {DEEPSEEK_MODEL}")
 
-            try:
-                async with aiohttp.ClientSession() as session:
-                    headers = {
-                        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-                        "Content-Type": "application/json"
-                    }
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        headers = {
+                            "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                            "Content-Type": "application/json"
+                        }
 
-                    payload = {
-                        "model": DEEPSEEK_MODEL,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}
-                        ]
-                    }
+                        payload = {
+                            "model": DEEPSEEK_MODEL,
+                            "messages": [
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": user_prompt}
+                            ]
+                        }
 
-                    debug_print(f"DeepSeek API request payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
-                    debug_print(f"Sending request to DeepSeek API: https://api.deepseek.com/chat/completions")
+                        debug_print(f"DeepSeek API request payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
+                        debug_print(f"Sending request to DeepSeek API: https://api.deepseek.com/chat/completions")
 
-                    async with session.post(
-                        "https://api.deepseek.com/chat/completions",
-                        headers=headers,
-                        json=payload
-                    ) as response:
-                        if response.status != 200:
-                            error_text = await response.text()
-                            print(f"[Summary] DeepSeek API error: {response.status} - {error_text}")
-                            debug_print(f"DeepSeek API error response: {error_text}")
-                            return None
+                        async with session.post(
+                            "https://api.deepseek.com/chat/completions",
+                            headers=headers,
+                            json=payload
+                        ) as response:
+                            if response.status != 200:
+                                error_text = await response.text()
+                                print(f"[Summary] DeepSeek API error: {response.status} - {error_text}")
+                                debug_print(f"DeepSeek API error response: {error_text}")
 
-                        data = await response.json()
-                        debug_print(f"DeepSeek API response: {json.dumps(data, ensure_ascii=False, indent=2)}")
+                                # Try to fallback to OpenRouter if available
+                                if OPENROUTER_API_KEY and OPENROUTER_MODEL:
+                                    print("[Summary] Falling back to OpenRouter API after DeepSeek API error")
+                                    debug_print("Falling back to OpenRouter API after DeepSeek API error")
+                                    use_openrouter = True
+                                else:
+                                    return None
+                            else:
+                                data = await response.json()
+                                debug_print(f"DeepSeek API response: {json.dumps(data, ensure_ascii=False, indent=2)}")
 
-                        if not data.get("choices") or not data["choices"][0].get("message"):
-                            print(f"[Summary] Invalid response from DeepSeek API: {data}")
-                            debug_print(f"Invalid response structure from DeepSeek API: {data}")
-                            return None
+                                if not data.get("choices") or not data["choices"][0].get("message"):
+                                    print(f"[Summary] Invalid response from DeepSeek API: {data}")
+                                    debug_print(f"Invalid response structure from DeepSeek API: {data}")
 
-                        summary = data["choices"][0]["message"]["content"]
-                        debug_print(f"DeepSeek API summary (first 500 chars): {summary[:500]}...")
-            except Exception as e:
-                print(f"[Summary] Error calling DeepSeek API: {e}")
-                debug_print(f"Exception when calling DeepSeek API: {str(e)}")
-                debug_print(f"Exception type: {type(e).__name__}")
-                debug_print(f"Exception traceback: {traceback.format_exc()}")
-                return None
+                                    # Try to fallback to OpenRouter if available
+                                    if OPENROUTER_API_KEY and OPENROUTER_MODEL:
+                                        print("[Summary] Falling back to OpenRouter API after invalid DeepSeek response")
+                                        debug_print("Falling back to OpenRouter API after invalid DeepSeek response")
+                                        use_openrouter = True
+                                    else:
+                                        return None
+                                else:
+                                    summary = data["choices"][0]["message"]["content"]
+                                    debug_print(f"DeepSeek API summary (first 500 chars): {summary[:500]}...")
+                except Exception as e:
+                    print(f"[Summary] Error calling DeepSeek API: {e}")
+                    debug_print(f"Exception when calling DeepSeek API: {str(e)}")
+                    debug_print(f"Exception type: {type(e).__name__}")
+                    debug_print(f"Exception traceback: {traceback.format_exc()}")
 
-        elif SUMMARY_API_PROVIDER.lower() == 'openrouter':
+                    # Try to fallback to OpenRouter if available
+                    if OPENROUTER_API_KEY and OPENROUTER_MODEL:
+                        print("[Summary] Falling back to OpenRouter API after DeepSeek API exception")
+                        debug_print("Falling back to OpenRouter API after DeepSeek API exception")
+                        use_openrouter = True
+                    else:
+                        return None
+
+        if SUMMARY_API_PROVIDER.lower() == 'openrouter' or use_openrouter:
             # Use OpenRouter API
             if not OPENROUTER_API_KEY:
                 print("[Summary] OpenRouter API key is missing")
@@ -379,6 +416,8 @@ class ChatSummary(commands.Cog):
             debug_print(f"Unknown API provider: {SUMMARY_API_PROVIDER}")
             debug_print(f"Supported providers are 'deepseek' and 'openrouter'")
             return None
+
+        # If we got here, we have a summary from either DeepSeek or OpenRouter
 
         # Process the summary to replace TOPIC_START markers with actual message links
         import re
