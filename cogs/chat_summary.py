@@ -281,7 +281,7 @@ class ChatSummary(commands.Cog):
             print(f"[Summary] Initializing OpenAI client with DeepSeek API base URL")
             client = OpenAI(
                 api_key=DEEPSEEK_API_KEY,
-                base_url="https://api.deepseek.com/v3"  # Changed from "https://api.deepseek.com/v1"
+                base_url="https://api.deepseek.com/v1"
             )
 
             # Prepare messages for API
@@ -307,7 +307,7 @@ class ChatSummary(commands.Cog):
 
             # Convert response to dictionary for token tracker
             print(f"[Summary] Converting response to dictionary for token tracking")
-            response_dict = response.model_dump()
+            response_dict = response.to_dict()
             print(f"[Summary] Response received with {response.usage.prompt_tokens} prompt tokens and {response.usage.completion_tokens} completion tokens")
 
             # Track token usage
