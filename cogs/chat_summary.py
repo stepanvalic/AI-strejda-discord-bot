@@ -14,8 +14,6 @@ from openai import OpenAI
 CHAT_ID = config.get_int('SUMMARY_CHAT_ID')
 SUMMARY_CHANNEL_ID = config.get_int('SUMMARY_CHANNEL_ID')
 SUMMARY_API_PROVIDER = config.get('SUMMARY_API_PROVIDER')
-OPENROUTER_API_KEY = config.get('OPENROUTER_API_KEY')
-OPENROUTER_MODEL = config.get('OPENROUTER_MODEL')
 DEEPSEEK_API_KEY = config.get('DEEPSEEK_API_KEY')
 DEEPSEEK_MODEL = config.get('DEEPSEEK_MODEL')
 SUMMARY_COOLDOWN_HOURS = config.get_int('SUMMARY_COOLDOWN_HOURS')
@@ -260,156 +258,72 @@ class ChatSummary(commands.Cog):
 
         print(f"[Summary] API provider from config: {SUMMARY_API_PROVIDER}")
 
-        use_openrouter = False
-
-        if SUMMARY_API_PROVIDER.lower() == 'deepseek':
-            # Use DeepSeek API
-            if not DEEPSEEK_API_KEY:
-                print("[Summary] DeepSeek API key is missing in environment variables")
-                print("[Summary] Please add DEEPSEEK_API_KEY to your .env file")
-
-                # Try to fallback to OpenRouter if available
-                if OPENROUTER_API_KEY and OPENROUTER_MODEL:
-                    print("[Summary] Falling back to OpenRouter API")
-                    print("[Summary] Falling back to OpenRouter API since DeepSeek API key is missing")
-                    use_openrouter = True
-                else:
-                    return None
-
-            if not DEEPSEEK_MODEL and not use_openrouter:
-                print("[Summary] DeepSeek model is not specified in configuration")
-                return None
-
-            if not use_openrouter:
-                print(f"[Summary] Generating summary for {date} with {len(messages)} messages using DeepSeek model {DEEPSEEK_MODEL}")
-                print(f"[Summary] Using DeepSeek API with model {DEEPSEEK_MODEL}")
-
-                try:
-                    # Initialize OpenAI client for DeepSeek API
-                    print(f"[Summary] Initializing OpenAI client with DeepSeek API base URL")
-                    client = OpenAI(
-                        api_key=DEEPSEEK_API_KEY,
-                        base_url="https://api.deepseek.com/v3"  # Changed from "https://api.deepseek.com/v1"
-                    )
-
-                    # Prepare messages for API
-                    print(f"[Summary] Preparing messages for DeepSeek API")
-                    messages = [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ]
-
-                    print(f"[Summary] Request prepared with system prompt ({len(system_prompt)} chars) and user prompt ({len(user_prompt)} chars)")
-
-                    # Send request to API
-                    print(f"[Summary] Sending request to DeepSeek API using OpenAI SDK")
-                    response = await asyncio.to_thread(
-                        client.chat.completions.create,
-                        model=DEEPSEEK_MODEL,  # Use the configured model name
-                        messages=messages,
-                        stream=False
-                    )
-
-                    # Process response
-                    print(f"[Summary] DeepSeek API response received successfully")
-
-                    # Convert response to dictionary for token tracker
-                    print(f"[Summary] Converting response to dictionary for token tracking")
-                    response_dict = response.model_dump()
-                    print(f"[Summary] Response received with {response.usage.prompt_tokens} prompt tokens and {response.usage.completion_tokens} completion tokens")
-
-                    # Track token usage
-                    print(f"[Summary] Tracking token usage from DeepSeek API response")
-                    token_tracker.extract_tokens_from_deepseek_response(response_dict, "summary")
-
-                    # Extract content from response
-                    print(f"[Summary] Extracting content from DeepSeek API response")
-                    summary = response.choices[0].message.content
-                    print(f"[Summary] Successfully generated summary with DeepSeek API (length: {len(summary)} chars)")
-                    print(f"[Summary] Summary preview (first 100 chars): {summary[:100]}...")
-                except Exception as e:
-                    print(f"[Summary] Error calling DeepSeek API: {e}")
-                    print(f"[Summary] Exception type: {type(e).__name__}")
-                    print(f"[Summary] Exception traceback: {traceback.format_exc()}")
-
-                    # Try to fallback to OpenRouter if available
-                    if OPENROUTER_API_KEY and OPENROUTER_MODEL:
-                        print("[Summary] Falling back to OpenRouter API after DeepSeek API exception")
-                        use_openrouter = True
-                    else:
-                        print("[Summary] No fallback available, returning None")
-                        return None
-
-        if SUMMARY_API_PROVIDER.lower() == 'openrouter' or use_openrouter:
-            # Use OpenRouter API
-            if not OPENROUTER_API_KEY:
-                print("[Summary] OpenRouter API key is missing")
-                debug_print("OpenRouter API key is missing in environment variables")
-                return None
-
-            if not OPENROUTER_MODEL:
-                print("[Summary] OpenRouter model is not specified")
-                debug_print("OpenRouter model is not specified in configuration")
-                return None
-
-            print(f"[Summary] Generating summary for {date} with {len(messages)} messages using OpenRouter model {OPENROUTER_MODEL}")
-            debug_print(f"Using OpenRouter API with model {OPENROUTER_MODEL}")
-
-            try:
-                async with aiohttp.ClientSession() as session:
-                    headers = {
-                        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                        "Content-Type": "application/json"
-                    }
-
-                    payload = {
-                        "model": OPENROUTER_MODEL,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}
-                        ]
-                    }
-
-                    debug_print(f"OpenRouter API request payload: {json.dumps(payload, ensure_ascii=False, indent=2)}")
-                    debug_print(f"Sending request to OpenRouter API: https://openrouter.ai/api/v1/chat/completions")
-
-                    async with session.post(
-                        "https://openrouter.ai/api/v1/chat/completions",
-                        headers=headers,
-                        json=payload
-                    ) as response:
-                        if response.status != 200:
-                            error_text = await response.text()
-                            print(f"[Summary] OpenRouter API error: {response.status} - {error_text}")
-                            debug_print(f"OpenRouter API error response: {error_text}")
-                            return None
-
-                        data = await response.json()
-                        debug_print(f"OpenRouter API response: {json.dumps(data, ensure_ascii=False, indent=2)}")
-
-                        # Sledování využití tokenů
-                        token_tracker.extract_tokens_from_openrouter_response(data, "summary")
-
-                        if not data.get("choices") or not data["choices"][0].get("message"):
-                            print(f"[Summary] Invalid response from OpenRouter API: {data}")
-                            debug_print(f"Invalid response structure from OpenRouter API: {data}")
-                            return None
-
-                        summary = data["choices"][0]["message"]["content"]
-                        debug_print(f"OpenRouter API summary (first 500 chars): {summary[:500]}...")
-            except Exception as e:
-                print(f"[Summary] Error calling OpenRouter API: {e}")
-                debug_print(f"Exception when calling OpenRouter API: {str(e)}")
-                debug_print(f"Exception type: {type(e).__name__}")
-                debug_print(f"Exception traceback: {traceback.format_exc()}")
-                return None
-        else:
+        if SUMMARY_API_PROVIDER.lower() != 'deepseek':
             print(f"[Summary] Unknown API provider: {SUMMARY_API_PROVIDER}")
-            debug_print(f"Unknown API provider: {SUMMARY_API_PROVIDER}")
-            debug_print(f"Supported providers are 'deepseek' and 'openrouter'")
+            print(f"[Summary] Supported providers are 'deepseek'")
             return None
 
-        # If we got here, we have a summary from either DeepSeek or OpenRouter
+        # Use DeepSeek API
+        if not DEEPSEEK_API_KEY:
+            print("[Summary] DeepSeek API key is missing in environment variables")
+            print("[Summary] Please add DEEPSEEK_API_KEY to your .env file")
+            return None
+
+        if not DEEPSEEK_MODEL:
+            print("[Summary] DeepSeek model is not specified in configuration")
+            return None
+
+        print(f"[Summary] Generating summary for {date} with {len(messages)} messages using DeepSeek model {DEEPSEEK_MODEL}")
+        print(f"[Summary] Using DeepSeek API with model {DEEPSEEK_MODEL}")
+
+        try:
+            # Initialize OpenAI client for DeepSeek API
+            print(f"[Summary] Initializing OpenAI client with DeepSeek API base URL")
+            client = OpenAI(
+                api_key=DEEPSEEK_API_KEY,
+                base_url="https://api.deepseek.com/v3"  # Changed from "https://api.deepseek.com/v1"
+            )
+
+            # Prepare messages for API
+            print(f"[Summary] Preparing messages for DeepSeek API")
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+
+            print(f"[Summary] Request prepared with system prompt ({len(system_prompt)} chars) and user prompt ({len(user_prompt)} chars)")
+
+            # Send request to API
+            print(f"[Summary] Sending request to DeepSeek API using OpenAI SDK")
+            response = await asyncio.to_thread(
+                client.chat.completions.create,
+                model=DEEPSEEK_MODEL,  # Use the configured model name
+                messages=messages,
+                stream=False
+            )
+
+            # Process response
+            print(f"[Summary] DeepSeek API response received successfully")
+
+            # Convert response to dictionary for token tracker
+            print(f"[Summary] Converting response to dictionary for token tracking")
+            response_dict = response.model_dump()
+            print(f"[Summary] Response received with {response.usage.prompt_tokens} prompt tokens and {response.usage.completion_tokens} completion tokens")
+
+            # Track token usage
+            print(f"[Summary] Tracking token usage from DeepSeek API response")
+            token_tracker.extract_tokens_from_deepseek_response(response_dict, "summary")
+
+            # Extract content from response
+            print(f"[Summary] Extracting content from DeepSeek API response")
+            summary = response.choices[0].message.content
+            print(f"[Summary] Successfully generated summary with DeepSeek API (length: {len(summary)} chars)")
+            print(f"[Summary] Summary preview (first 100 chars): {summary[:100]}...")
+        except Exception as e:
+            print(f"[Summary] Error calling DeepSeek API: {e}")
+            print(f"[Summary] Exception type: {type(e).__name__}")
+            print(f"[Summary] Exception traceback: {traceback.format_exc()}")
+            return None
 
         # Process the summary to replace TOPIC_START markers with actual message links
         import re
