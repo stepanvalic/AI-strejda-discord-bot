@@ -86,6 +86,9 @@ async def load_extensions():
     await bot.load_extension("cogs.logger")
     print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}logger{Fore.MAGENTA} cog")
 
+    await bot.load_extension("cogs.bookmarks")
+    print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}bookmarks{Fore.MAGENTA} cog")
+
 async def main():
     async with bot:
         await load_extensions()
