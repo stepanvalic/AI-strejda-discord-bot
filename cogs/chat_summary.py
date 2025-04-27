@@ -285,18 +285,14 @@ class ChatSummary(commands.Cog):
                 print(f"[Summary] Using DeepSeek API with model {DEEPSEEK_MODEL}")
 
                 try:
-                    # Použití OpenAI SDK pro volání DeepSeek API
-                    print(f"[Summary] Using OpenAI SDK to call DeepSeek API with model {DEEPSEEK_MODEL}")
-
-
-                    # Inicializace klienta OpenAI s DeepSeek API
+                    # Initialize OpenAI client for DeepSeek API
                     print(f"[Summary] Initializing OpenAI client with DeepSeek API base URL")
                     client = OpenAI(
                         api_key=DEEPSEEK_API_KEY,
-                        base_url="https://api.deepseek.com/v1"  # Můžeme použít i "https://api.deepseek.com"
+                        base_url="https://api.deepseek.com"  # Changed from "https://api.deepseek.com/v1"
                     )
 
-                    # Příprava zpráv pro API
+                    # Prepare messages for API
                     print(f"[Summary] Preparing messages for DeepSeek API")
                     messages = [
                         {"role": "system", "content": system_prompt},
@@ -305,29 +301,28 @@ class ChatSummary(commands.Cog):
 
                     print(f"[Summary] Request prepared with system prompt ({len(system_prompt)} chars) and user prompt ({len(user_prompt)} chars)")
 
-                    # Odeslání požadavku na API
+                    # Send request to API
                     print(f"[Summary] Sending request to DeepSeek API using OpenAI SDK")
                     response = await asyncio.to_thread(
                         client.chat.completions.create,
-                        model=DEEPSEEK_MODEL,
+                        model=DEEPSEEK_MODEL,  # Use the configured model name
                         messages=messages,
                         stream=False
                     )
 
-                    # Zpracování odpovědi
+                    # Process response
                     print(f"[Summary] DeepSeek API response received successfully")
 
-
-                    # Převod odpovědi na slovník pro token tracker
+                    # Convert response to dictionary for token tracker
                     print(f"[Summary] Converting response to dictionary for token tracking")
                     response_dict = response.model_dump()
                     print(f"[Summary] Response received with {response.usage.prompt_tokens} prompt tokens and {response.usage.completion_tokens} completion tokens")
 
-                    # Sledování využití tokenů
+                    # Track token usage
                     print(f"[Summary] Tracking token usage from DeepSeek API response")
                     token_tracker.extract_tokens_from_deepseek_response(response_dict, "summary")
 
-                    # Získání obsahu odpovědi
+                    # Extract content from response
                     print(f"[Summary] Extracting content from DeepSeek API response")
                     summary = response.choices[0].message.content
                     print(f"[Summary] Successfully generated summary with DeepSeek API (length: {len(summary)} chars)")
@@ -337,11 +332,9 @@ class ChatSummary(commands.Cog):
                     print(f"[Summary] Exception type: {type(e).__name__}")
                     print(f"[Summary] Exception traceback: {traceback.format_exc()}")
 
-
                     # Try to fallback to OpenRouter if available
                     if OPENROUTER_API_KEY and OPENROUTER_MODEL:
                         print("[Summary] Falling back to OpenRouter API after DeepSeek API exception")
-
                         use_openrouter = True
                     else:
                         print("[Summary] No fallback available, returning None")
