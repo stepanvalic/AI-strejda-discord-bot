@@ -5,47 +5,52 @@ import asyncio
 import datetime
 import google.generativeai as genai
 from discord.ext import commands, tasks
-from dotenv import load_dotenv
+from utils import config, token_tracker
 
-load_dotenv()
-
-# Load configuration from .env
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-AI_MODEL = os.getenv('AI_MODEL', 'gemini-2.0-flash')
-# Message batch size - must be set in .env
-# Force reload the .env file to get the latest values
-load_dotenv(override=True)
-AI_MESSAGES_BATCH_STR = os.getenv('AI_MESSAGES_BATCH')
-if not AI_MESSAGES_BATCH_STR:
-    print("[AI Mod] ERROR: AI_MESSAGES_BATCH not set in .env file. AI moderation will not function properly.")
+# Load configuration
+GEMINI_API_KEY = config.get('GEMINI_API_KEY')
+AI_MODEL = config.get('AI_MODEL', 'gemini-2.0-flash')
+# Message batch size
+AI_MESSAGES_BATCH = config.get_int('AI_MESSAGES_BATCH')
+if not AI_MESSAGES_BATCH:
+    print("[AI Mod] ERROR: AI_MESSAGES_BATCH not set in configuration. AI moderation will not function properly.")
     AI_MESSAGES_BATCH = 0  # Will prevent processing
 else:
+    print(f"[AI Mod] Using batch size of {AI_MESSAGES_BATCH} messages")
+
+AI_MODERATION_SAVE_FILE = config.get('AI_MODERATION_SAVE_FILE', 'db/ai_moderation.json')
+AI_MODERATION_INTERVAL_MINUTES = config.get_int('AI_MODERATION_INTERVAL_MINUTES', 5)
+
+# Channel IDs where moderation should be active
+AI_MODERATION_CHANNEL_IDS = config.get('AI_MODERATION_CHANNEL_IDS', [])
+# Convert to integers if provided as strings
+if AI_MODERATION_CHANNEL_IDS:
     try:
-        AI_MESSAGES_BATCH = int(AI_MESSAGES_BATCH_STR)
-        print(f"[AI Mod] Using batch size of {AI_MESSAGES_BATCH} messages")
-    except ValueError:
-        print(f"[AI Mod] ERROR: Invalid AI_MESSAGES_BATCH value: {AI_MESSAGES_BATCH_STR}. AI moderation will not function properly.")
-        AI_MESSAGES_BATCH = 0  # Will prevent processing
-AI_MODERATION_SAVE_FILE = os.getenv('AI_MODERATION_SAVE_FILE', 'db/ai_moderation.json')
-AI_MODERATION_INTERVAL_MINUTES = int(os.getenv('AI_MODERATION_INTERVAL_MINUTES', 5))
+        AI_MODERATION_CHANNEL_IDS = [int(channel_id) if isinstance(channel_id, str) else channel_id for channel_id in AI_MODERATION_CHANNEL_IDS]
+        print(f"[AI Mod] Moderation active in {len(AI_MODERATION_CHANNEL_IDS)} channels: {AI_MODERATION_CHANNEL_IDS}")
+    except (ValueError, TypeError) as e:
+        print(f"[AI Mod] Error parsing AI_MODERATION_CHANNEL_IDS: {e}")
+        AI_MODERATION_CHANNEL_IDS = []
+else:
+    print("[AI Mod] No channel restrictions set. Moderation will be active in all channels.")
 
 # Positive thresholds
-AI_POSITIVE_THRESHOLD_1 = int(os.getenv('AI_POSITIVE_THRESHOLD_1', 800))
-AI_POSITIVE_THRESHOLD_2 = int(os.getenv('AI_POSITIVE_THRESHOLD_2', 2000))
-AI_POSITIVE_THRESHOLD_3 = int(os.getenv('AI_POSITIVE_THRESHOLD_3', 5000))
+AI_POSITIVE_THRESHOLD_1 = config.get_int('AI_POSITIVE_THRESHOLD_1', 800)
+AI_POSITIVE_THRESHOLD_2 = config.get_int('AI_POSITIVE_THRESHOLD_2', 2000)
+AI_POSITIVE_THRESHOLD_3 = config.get_int('AI_POSITIVE_THRESHOLD_3', 5000)
 
 # Negative thresholds
-AI_NEGATIVE_THRESHOLD = int(os.getenv('AI_NEGATIVE_THRESHOLD', -30))
-AI_VERY_NEGATIVE_THRESHOLD = int(os.getenv('AI_VERY_NEGATIVE_THRESHOLD', -1000))
+AI_NEGATIVE_THRESHOLD = config.get_int('AI_NEGATIVE_THRESHOLD', -30)
+AI_VERY_NEGATIVE_THRESHOLD = config.get_int('AI_VERY_NEGATIVE_THRESHOLD', -1000)
 
 # Penalty for very negative messages
-AI_NEGATIVE_PENALTY = int(os.getenv('AI_NEGATIVE_PENALTY', -50))
+AI_NEGATIVE_PENALTY = config.get_int('AI_NEGATIVE_PENALTY', -50)
 
 # Role IDs
-AI_POSITIVE_ROLE_ID_1 = os.getenv('AI_POSITIVE_ROLE_ID_1')
-AI_POSITIVE_ROLE_ID_2 = os.getenv('AI_POSITIVE_ROLE_ID_2')
-AI_POSITIVE_ROLE_ID_3 = os.getenv('AI_POSITIVE_ROLE_ID_3')
-AI_NEGATIVE_ROLE_ID = os.getenv('AI_NEGATIVE_ROLE_ID')
+AI_POSITIVE_ROLE_ID_1 = config.get('AI_POSITIVE_ROLE_ID_1')
+AI_POSITIVE_ROLE_ID_2 = config.get('AI_POSITIVE_ROLE_ID_2')
+AI_POSITIVE_ROLE_ID_3 = config.get('AI_POSITIVE_ROLE_ID_3')
+AI_NEGATIVE_ROLE_ID = config.get('AI_NEGATIVE_ROLE_ID')
 
 # Configure Gemini API
 genai.configure(api_key=GEMINI_API_KEY)
@@ -77,17 +82,10 @@ except ValueError:
 
 class AIModeration(commands.Cog):
     def __init__(self, bot):
-        # Force reload the .env file to get the latest values
-        load_dotenv(override=True)
-        # Get the batch size again to ensure we have the latest value
-        ai_messages_batch_str = os.getenv('AI_MESSAGES_BATCH')
-        if ai_messages_batch_str:
-            try:
-                global AI_MESSAGES_BATCH
-                AI_MESSAGES_BATCH = int(ai_messages_batch_str)
-                print(f"[AI Mod] Initialized with batch size of {AI_MESSAGES_BATCH} messages")
-            except ValueError:
-                pass
+        # Get the batch size from config
+        global AI_MESSAGES_BATCH
+        AI_MESSAGES_BATCH = config.get_int('AI_MESSAGES_BATCH')
+        print(f"[AI Mod] Initialized with batch size of {AI_MESSAGES_BATCH} messages")
 
         self.bot = bot
         self.pending_messages = {}  # {user_id: [messages]}
@@ -185,6 +183,11 @@ class AIModeration(commands.Cog):
         if message.content.startswith('!') or 'http://' in message.content or 'https://' in message.content:
             return
 
+        # Check if moderation is enabled for this channel
+        if AI_MODERATION_CHANNEL_IDS and message.channel.id not in AI_MODERATION_CHANNEL_IDS:
+            # Skip messages from channels not in the allowed list
+            return
+
         # Add message to pending queue
         user_id = message.author.id
         if user_id not in self.pending_messages:
@@ -268,6 +271,10 @@ Provide your analysis in the following JSON format:
             )
 
             print("[AI Mod] Received response from Gemini API")
+
+            # Sledování využití tokenů
+            token_tracker.extract_tokens_from_gemini_response(response, "moderation", prompt_text=combined_text)
+
             # Parse the response
             if response.text:
                 try:
@@ -766,6 +773,136 @@ Provide your analysis in the following JSON format:
         # Send embed
         await ctx.send(embed=embed, ephemeral=True)
 
+    @commands.command(name="aicheck")
+    @commands.has_permissions(administrator=True)
+    async def ai_check_roles(self, ctx):
+        """Zkontroluje a opraví role všech členů podle jejich AI skóre (admin only)"""
+        # Informovat o zahájení kontroly
+        status_message = await ctx.send("⏳ Zahajuji kontrolu rolí všech členů podle AI skóre...")
+
+        # Statistiky
+        stats = {
+            "checked": 0,
+            "no_score": 0,
+            "roles_added": 0,
+            "roles_removed": 0,
+            "members_updated": 0,
+            "errors": 0
+        }
+
+        # Role k ověření
+        roles_to_check = []
+        if AI_POSITIVE_ROLE_ID_1:
+            roles_to_check.append((AI_POSITIVE_ROLE_ID_1, "level 1 positive", AI_POSITIVE_THRESHOLD_1, "has_positive_role_1"))
+        if AI_POSITIVE_ROLE_ID_2:
+            roles_to_check.append((AI_POSITIVE_ROLE_ID_2, "level 2 positive", AI_POSITIVE_THRESHOLD_2, "has_positive_role_2"))
+        if AI_POSITIVE_ROLE_ID_3:
+            roles_to_check.append((AI_POSITIVE_ROLE_ID_3, "level 3 positive", AI_POSITIVE_THRESHOLD_3, "has_positive_role_3"))
+        if AI_NEGATIVE_ROLE_ID:
+            roles_to_check.append((AI_NEGATIVE_ROLE_ID, "negative", AI_VERY_NEGATIVE_THRESHOLD, "has_negative_role"))
+
+        # Získat všechny členy serveru
+        members = ctx.guild.members
+        total_members = len(members)
+
+        # Aktualizovat zprávu o stavu
+        await status_message.edit(content=f"⏳ Kontroluji role pro {total_members} členů...")
+
+        # Projít všechny členy
+        for i, member in enumerate(members):
+            # Přeskočit boty
+            if member.bot:
+                continue
+
+            # Přeskočit administrátory (neaplikujeme na ně role)
+            if member.guild_permissions.administrator:
+                continue
+
+            stats["checked"] += 1
+
+            # Získat data uživatele
+            user_id = str(member.id)
+            if user_id not in self.data["users"]:
+                stats["no_score"] += 1
+                continue
+
+            user_data = self.data["users"][user_id]
+            member_updated = False
+
+            # Kontrola rolí
+            for role_id, role_name, threshold, has_role_key in roles_to_check:
+                role = ctx.guild.get_role(role_id)
+                if not role:
+                    print(f"[AI Mod] Role {role_id} ({role_name}) nebyla nalezena")
+                    continue
+
+                # Speciální logika pro negativní roli (práh je horní hranice)
+                if role_name == "negative":
+                    should_have_role = user_data["total_score"] <= threshold
+                else:
+                    # Pro pozitivní role je práh dolní hranice
+                    should_have_role = user_data["total_score"] >= threshold
+
+                has_role = role in member.roles
+                has_role_in_data = user_data.get(has_role_key, False)
+
+                # Synchronizovat stav role
+                try:
+                    if should_have_role and not has_role:
+                        # Přidat roli
+                        await member.add_roles(role, reason=f"AI Moderation: Role check - score: {user_data['total_score']}")
+                        user_data[has_role_key] = True
+                        stats["roles_added"] += 1
+                        member_updated = True
+                        print(f"[AI Mod] Added {role_name} role to {member.display_name}")
+                    elif not should_have_role and has_role:
+                        # Odebrat roli
+                        await member.remove_roles(role, reason=f"AI Moderation: Role check - score: {user_data['total_score']}")
+                        user_data[has_role_key] = False
+                        stats["roles_removed"] += 1
+                        member_updated = True
+                        print(f"[AI Mod] Removed {role_name} role from {member.display_name}")
+
+                    # Synchronizovat stav v datech, pokud se liší od skutečnosti
+                    if has_role != has_role_in_data:
+                        user_data[has_role_key] = has_role
+                        member_updated = True
+                except Exception as e:
+                    print(f"[AI Mod] Error updating roles for {member.display_name}: {e}")
+                    stats["errors"] += 1
+
+            # Uložit změny v datech
+            if member_updated:
+                stats["members_updated"] += 1
+                self.save_data()
+
+            # Aktualizovat zprávu o stavu každých 10 členů
+            if i % 10 == 0:
+                await status_message.edit(content=f"⏳ Kontroluji role... {i}/{total_members} členů zkontrolováno")
+
+        # Vytvořit embed s výsledky
+        embed = discord.Embed(
+            title="✅ Kontrola rolí dokončena",
+            description="Kontrola a oprava rolí podle AI skóre byla dokončena.",
+            color=discord.Color.green()
+        )
+
+        embed.add_field(
+            name="📊 Statistiky",
+            value=f"**Zkontrolováno členů:** {stats['checked']}\n"
+                  f"**Členů bez skóre:** {stats['no_score']}\n"
+                  f"**Přidáno rolí:** {stats['roles_added']}\n"
+                  f"**Odebráno rolí:** {stats['roles_removed']}\n"
+                  f"**Aktualizováno členů:** {stats['members_updated']}\n"
+                  f"**Chyby:** {stats['errors']}",
+            inline=False
+        )
+
+        embed.set_footer(text="AI moderační systém")
+        embed.timestamp = datetime.datetime.now()
+
+        await status_message.edit(content=None, embed=embed)
+
     @commands.command(name="airules")
     @commands.has_permissions(administrator=True)
     async def ai_rules(self, ctx):
@@ -784,6 +921,29 @@ Provide your analysis in the following JSON format:
                   f"Interval kontroly: **{AI_MODERATION_INTERVAL_MINUTES}** minut.",
             inline=False
         )
+
+        # Moderated channels
+        if AI_MODERATION_CHANNEL_IDS:
+            channel_mentions = []
+            for channel_id in AI_MODERATION_CHANNEL_IDS:
+                channel = self.bot.get_channel(channel_id)
+                if channel:
+                    channel_mentions.append(f"<#{channel_id}>")
+                else:
+                    channel_mentions.append(f"ID: {channel_id}")
+
+            embed.add_field(
+                name="Moderované kanály",
+                value=f"AI moderace je aktivní pouze v těchto kanálech:\n"
+                      f"{', '.join(channel_mentions)}",
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="Moderované kanály",
+                value=f"AI moderace je aktivní ve všech kanálech.",
+                inline=False
+            )
 
         # Scoring system
         embed.add_field(
@@ -837,7 +997,8 @@ Provide your analysis in the following JSON format:
                   f"!aibottom - Zobrazí 10 nejhorších uživatelů\n"
                   f"!aireset [@uživatel] - Resetuje skóre uživatele (admin)\n"
                   f"!airesetall - Resetuje všechna skóre (admin)\n"
-                  f"!airules - Zobrazí tato pravidla (admin)",
+                  f"!airules - Zobrazí tato pravidla (admin)\n"
+                  f"!aicheck - Zkontroluje a opraví role všech členů (admin)",
             inline=False
         )
 

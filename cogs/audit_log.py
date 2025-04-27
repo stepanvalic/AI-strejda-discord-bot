@@ -2,14 +2,13 @@ import discord
 from discord.ext import commands
 import os
 import datetime
-from dotenv import load_dotenv
 import asyncio
+from utils import config
 
-# Načtení proměnných z .env souboru
-load_dotenv()
-AUDIT_LOG_CHANNEL_ID = int(os.getenv('AUDIT_LOG_CHANNEL_ID', 0))
-GUILD_ID = int(os.getenv('GUILD_ID', 0))
-COUNTING_CHANNEL_ID = int(os.getenv('COUNTING_CHANNEL_ID', 0))
+# Načtení proměnných z konfigurace
+AUDIT_LOG_CHANNEL_ID = config.get_int('AUDIT_LOG_CHANNEL_ID')
+GUILD_ID = config.get_int('GUILD_ID')
+COUNTING_CHANNEL_ID = config.get_int('COUNTING_CHANNEL_ID')
 
 class AuditLog(commands.Cog):
     def __init__(self, bot):
@@ -508,36 +507,61 @@ class AuditLog(commands.Cog):
         await ctx.send(f"Kanál {channel.mention} byl nastaven jako audit log.", ephemeral=True)
 
     def update_env_file(self, key, value):
-        """Aktualizuje hodnotu v .env souboru"""
-        env_path = '.env'
+        """Aktualizuje hodnotu v konfiguraci"""
+        # Check if this is a sensitive key that should be in .env
+        sensitive_keys = ['DISCORD_TOKEN', 'YOUTUBE_API_KEY', 'GEMINI_API_KEY', 'OPENROUTER_API_KEY', 'DEEPSEEK_API_KEY']
 
-        try:
-            with open(env_path, 'r') as file:
-                lines = file.readlines()
+        if key in sensitive_keys:
+            # Update .env file for sensitive keys
+            env_path = '.env'
+            try:
+                with open(env_path, 'r') as file:
+                    lines = file.readlines()
 
-            # Hledáme řádek s daným klíčem
-            key_exists = False
-            for i, line in enumerate(lines):
-                if line.startswith(f"{key}=") or line.startswith(f"# {key}="):
-                    lines[i] = f"{key}={value}\n"
-                    key_exists = True
-                    break
+                # Hledáme řádek s daným klíčem
+                key_exists = False
+                for i, line in enumerate(lines):
+                    if line.startswith(f"{key}=") or line.startswith(f"# {key}="):
+                        lines[i] = f"{key}={value}\n"
+                        key_exists = True
+                        break
 
-            # Pokud klíč neexistuje, přidáme ho na konec souboru
-            if not key_exists:
-                lines.append(f"{key}={value}\n")
+                # Pokud klíč neexistuje, přidáme ho na konec souboru
+                if not key_exists:
+                    lines.append(f"{key}={value}\n")
 
-            # Zapíšeme změny zpět do souboru
-            with open(env_path, 'w') as file:
-                file.writelines(lines)
+                # Zapíšeme změny zpět do souboru
+                with open(env_path, 'w') as file:
+                    file.writelines(lines)
 
-            print(f"Hodnota {key} byla aktualizována v .env souboru")
+                print(f"Hodnota {key} byla aktualizována v .env souboru")
+            except Exception as e:
+                print(f"Chyba při aktualizaci .env souboru: {e}")
+        else:
+            # Update config.json for non-sensitive keys
+            try:
+                import json
+                config_path = 'config.json'
 
-            # Znovu načteme .env soubor
-            load_dotenv(override=True)
+                try:
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        config_data = json.load(f)
+                except (FileNotFoundError, json.JSONDecodeError):
+                    config_data = {}
 
-        except Exception as e:
-            print(f"Chyba při aktualizaci .env souboru: {e}")
+                # Update the value
+                config_data[key] = value
+
+                # Save back to config.json
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    json.dump(config_data, f, indent=4)
+
+                print(f"Hodnota {key} byla aktualizována v config.json")
+            except Exception as e:
+                print(f"Chyba při aktualizaci config.json: {e}")
+
+        # Update the in-memory configuration
+        config.set(key, value)
 
     def get_channel_type(self, channel):
         """Vrátí typ kanálu v čitelné podobě"""

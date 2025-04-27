@@ -1,10 +1,8 @@
-import os
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
+from utils import config
 
-load_dotenv()
-WELCOME_CHANNEL_ID = int(os.getenv('WELCOME_CHANNEL_ID', 0))
+WELCOME_CHANNEL_ID = config.get_int('WELCOME_CHANNEL_ID')
 
 class Welcome(commands.Cog):
     def __init__(self, bot):

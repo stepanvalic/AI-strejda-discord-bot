@@ -1,39 +1,32 @@
 import discord
 from discord.ext import commands, tasks
-import os
-import json
 import aiohttp
 import datetime
-import re
-from dotenv import load_dotenv
-from utils import db
+from datetime import timedelta
+from utils import db, config
 
-load_dotenv()
-YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY')
-YOUTUBE_CHANNEL = os.getenv('YOUTUBE_CHANNEL_ID')
+YOUTUBE_API_KEY = config.get('YOUTUBE_API_KEY')
+YOUTUBE_CHANNEL = config.get('YOUTUBE_CHANNEL_ID')
 
 IS_USERNAME = YOUTUBE_CHANNEL.startswith('@')
 YOUTUBE_USERNAME = YOUTUBE_CHANNEL if IS_USERNAME else None
 YOUTUBE_CHANNEL_ID = None if IS_USERNAME else YOUTUBE_CHANNEL
 
-try:
-    YOUTUBE_NOTIFICATION_CHANNEL_ID = int(os.getenv('YOUTUBE_NOTIFICATION_CHANNEL_ID', 0))
-except ValueError:
-    YOUTUBE_NOTIFICATION_CHANNEL_ID = 0
-    print("Warning: Invalid YOUTUBE_NOTIFICATION_CHANNEL_ID in .env file")
+YOUTUBE_NOTIFICATION_CHANNEL_ID = config.get_int('YOUTUBE_NOTIFICATION_CHANNEL_ID')
 
-try:
-    CHECK_INTERVAL_SECONDS = int(os.getenv('CHECK_INTERVAL_SECONDS', 30))
-except ValueError:
-    CHECK_INTERVAL_SECONDS = 30
-    print("Warning: Invalid CHECK_INTERVAL_SECONDS in .env file")
+CHECK_INTERVAL_SECONDS = config.get_int('CHECK_INTERVAL_SECONDS', 30)
 
-UPDATE_INTERVAL_SECONDS = 5 * 60
+# Maximum age of a video to be considered "new" when the bot starts (in hours)
+# This helps catch videos published while the bot was offline
+NEW_VIDEO_MAX_AGE_HOURS = config.get_int('NEW_VIDEO_MAX_AGE_HOURS', 24)
+
+UPDATE_INTERVAL_SECONDS = 30 * 60
 
 class YouTubePing(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.last_video_id = None
+        self.initialized = False
 
         db.ensure_db_exists()
 
@@ -82,7 +75,8 @@ class YouTubePing(commands.Cog):
                 print(f"Could not find channel ID for username {YOUTUBE_USERNAME}")
                 return None
 
-        search_url = f"https://www.googleapis.com/youtube/v3/search?key={YOUTUBE_API_KEY}&channelId={channel_id}&part=snippet,id&order=date&maxResults=1&type=video"
+        # Hledáme videa i live streamy (type=video,live)
+        search_url = f"https://www.googleapis.com/youtube/v3/search?key={YOUTUBE_API_KEY}&channelId={channel_id}&part=snippet,id&order=date&maxResults=5&type=video"
 
         async with aiohttp.ClientSession() as session:
             async with session.get(search_url) as response:
@@ -93,39 +87,63 @@ class YouTubePing(commands.Cog):
                         print(f"No videos found for channel ID {channel_id}")
                         return None
 
-                    video_id = data['items'][0]['id'].get('videoId')
-                    if not video_id:
-                        return None
+                    # Procházíme výsledky a hledáme nejnovější video nebo live stream
+                    for item in data['items']:
+                        video_id = item['id'].get('videoId')
+                        if not video_id:
+                            continue
 
-                    video_url = f"https://www.googleapis.com/youtube/v3/videos?key={YOUTUBE_API_KEY}&id={video_id}&part=snippet,contentDetails,statistics"
+                        video_url = f"https://www.googleapis.com/youtube/v3/videos?key={YOUTUBE_API_KEY}&id={video_id}&part=snippet,contentDetails,statistics,liveStreamingDetails"
 
-                    async with session.get(video_url) as video_response:
-                        if video_response.status == 200:
-                            video_data = await video_response.json()
+                        async with session.get(video_url) as video_response:
+                            if video_response.status == 200:
+                                video_data = await video_response.json()
 
-                            if not video_data.get('items'):
-                                return None
+                                if not video_data.get('items'):
+                                    continue
 
-                            video_info = video_data['items'][0]
-                            snippet = video_info['snippet']
-                            content_details = video_info['contentDetails']
-                            statistics = video_info['statistics']
+                                video_info = video_data['items'][0]
+                                snippet = video_info['snippet']
+                                content_details = video_info['contentDetails']
+                                statistics = video_info['statistics']
 
-                            duration_iso = content_details['duration']
-                            duration = self.parse_duration(duration_iso)
+                                # Zjistíme, zda je to live stream
+                                is_live = False
+                                scheduled_start_time = None
+                                actual_start_time = None
 
-                            return {
-                                'id': video_id,
-                                'title': snippet['title'],
-                                'description': snippet['description'],
-                                'thumbnail': snippet['thumbnails']['maxres']['url'] if 'maxres' in snippet['thumbnails'] else snippet['thumbnails']['high']['url'],
-                                'published_at': snippet['publishedAt'],
-                                'duration': duration,
-                                'views': statistics.get('viewCount', '0'),
-                                'likes': statistics.get('likeCount', '0'),
-                                'comments': statistics.get('commentCount', '0'),
-                                'channel_title': snippet['channelTitle']
-                            }
+                                if 'liveStreamingDetails' in video_info:
+                                    live_details = video_info['liveStreamingDetails']
+
+                                    # Kontrola, zda je to aktivní live stream
+                                    if live_details.get('actualEndTime') is None and (
+                                        live_details.get('actualStartTime') is not None or
+                                        live_details.get('scheduledStartTime') is not None
+                                    ):
+                                        is_live = True
+                                        scheduled_start_time = live_details.get('scheduledStartTime')
+                                        actual_start_time = live_details.get('actualStartTime')
+
+                                # Získáme délku videa (pro live streamy to může být 0)
+                                duration_iso = content_details.get('duration', 'PT0S')
+                                duration = self.parse_duration(duration_iso)
+
+                                # Vytvoříme objekt s informacemi o videu/streamu
+                                return {
+                                    'id': video_id,
+                                    'title': snippet['title'],
+                                    'description': snippet['description'],
+                                    'thumbnail': snippet['thumbnails']['maxres']['url'] if 'maxres' in snippet['thumbnails'] else snippet['thumbnails']['high']['url'],
+                                    'published_at': snippet['publishedAt'],
+                                    'duration': duration,
+                                    'views': statistics.get('viewCount', '0'),
+                                    'likes': statistics.get('likeCount', '0'),
+                                    'comments': statistics.get('commentCount', '0'),
+                                    'channel_title': snippet['channelTitle'],
+                                    'is_live': is_live,
+                                    'scheduled_start_time': scheduled_start_time,
+                                    'actual_start_time': actual_start_time
+                                }
                 return None
 
     def parse_duration(self, duration_iso):
@@ -151,33 +169,82 @@ class YouTubePing(commands.Cog):
         else:
             return f"{minutes}:{seconds:02d}"
 
+    def is_video_recent(self, published_at):
+        """Check if a video was published recently (within NEW_VIDEO_MAX_AGE_HOURS)"""
+        try:
+            # Parse the published_at string to a datetime object
+            published_time = datetime.datetime.fromisoformat(published_at.replace('Z', '+00:00'))
+
+            # Calculate the time difference
+            now = datetime.datetime.now(datetime.timezone.utc)
+            time_diff = now - published_time
+
+            # Check if the video is within the max age
+            return time_diff <= timedelta(hours=NEW_VIDEO_MAX_AGE_HOURS)
+        except Exception as e:
+            print(f"Error checking if video is recent: {str(e)}")
+            # If there's an error, assume it's not recent to avoid spam
+            return False
+
     @tasks.loop(seconds=CHECK_INTERVAL_SECONDS)
     async def check_uploads(self):
         if not YOUTUBE_API_KEY:
             print("YouTube API key is missing")
             return
 
-        # Kontrola nových videí (debug vypnut)
+        # Kontrola nových videí
         video = await self.get_latest_video()
 
         if not video:
             return
 
+        # Save the video to the database
         db.save_video(video)
 
+        # Check if the video has already been announced
         if db.is_video_announced(video['id']):
-            return
-
-        if self.last_video_id is None:
-            announced_videos = db.get_announced_videos()
-
-            if announced_videos:
-                self.last_video_id = announced_videos[0]['video_id']
-            else:
+            # Update the last_video_id if needed
+            if self.last_video_id != video['id']:
                 self.last_video_id = video['id']
             return
 
+        # Special handling for first run to catch recent videos
+        if not self.initialized:
+            self.initialized = True
+            announced_videos = db.get_announced_videos()
+
+            if announced_videos:
+                # We have announced videos before, check if this one is new and recent
+                self.last_video_id = announced_videos[0]['video_id']
+
+                if video['id'] != self.last_video_id and self.is_video_recent(video['published_at']):
+                    print(f"Found recent new video during initialization: {video['title']}")
+                    self.last_video_id = video['id']
+                    await self.send_notification(video)
+            else:
+                # No videos have been announced yet, announce this one if it's recent
+                if self.is_video_recent(video['published_at']):
+                    print(f"Announcing first video during initialization: {video['title']}")
+                    self.last_video_id = video['id']
+                    await self.send_notification(video)
+                else:
+                    # Just save the ID without announcing if it's not recent
+                    self.last_video_id = video['id']
+            return
+
+        # If we get here, we're past initialization
+
+        # If last_video_id is still None (shouldn't happen, but just in case)
+        if self.last_video_id is None:
+            self.last_video_id = video['id']
+            # Only announce if it's recent
+            if self.is_video_recent(video['published_at']):
+                await self.send_notification(video)
+            return
+
+        # Normal operation - announce if it's a new video
         if video['id'] != self.last_video_id:
+            print(f"New video detected: {video['title']}")
             self.last_video_id = video['id']
             await self.send_notification(video)
 
@@ -191,14 +258,41 @@ class YouTubePing(commands.Cog):
 
         channel_url = f"https://www.youtube.com/{YOUTUBE_CHANNEL}" if IS_USERNAME else f"https://www.youtube.com/channel/{YOUTUBE_CHANNEL}"
 
+        # Upravíme název podle typu obsahu
+        if video.get('is_live', False):
+            if video.get('actual_start_time'):
+                author_name = f"🔴 {video['channel_title']} právě vysílá živě!"
+            else:
+                author_name = f"🔴 {video['channel_title']} naplánoval živé vysílání!"
+        else:
+            author_name = f"Nové video od {video['channel_title']}!"
+
         embed.set_author(
-            name=f"Nové video od {video['channel_title']}!",
+            name=author_name,
             icon_url="https://s.ytimg.com/yts/img/favicon_144-vfliLAfaB.png",
             url=channel_url
         )
 
+        # Přidáme různý obsah zprávy podle typu
+        if video.get('is_live', False):
+            if video.get('actual_start_time'):
+                content = f"@everyone {video['channel_title']} právě vysílá živě! Připojte se ke streamu!"
+            else:
+                # Pro naplánované streamy nepoužíváme @everyone
+                scheduled_time = None
+                if video.get('scheduled_start_time'):
+                    scheduled_time = datetime.datetime.fromisoformat(video['scheduled_start_time'].replace('Z', '+00:00'))
+                    # Převedeme na lokální čas
+                    local_time = scheduled_time.astimezone()
+                    time_str = local_time.strftime("%d.%m.%Y v %H:%M")
+                    content = f"{video['channel_title']} naplánoval živé vysílání na {time_str}!"
+                else:
+                    content = f"{video['channel_title']} naplánoval živé vysílání!"
+        else:
+            content = f"@everyone Nové video od {video['channel_title']}!"
+
         message = await channel.send(
-            content=f"@everyone",
+            content=content,
             embed=embed
         )
 
@@ -257,7 +351,7 @@ class YouTubePing(commands.Cog):
         if not YOUTUBE_API_KEY:
             return None
 
-        video_url = f"https://www.googleapis.com/youtube/v3/videos?key={YOUTUBE_API_KEY}&id={video_id}&part=snippet,contentDetails,statistics"
+        video_url = f"https://www.googleapis.com/youtube/v3/videos?key={YOUTUBE_API_KEY}&id={video_id}&part=snippet,contentDetails,statistics,liveStreamingDetails"
 
         async with aiohttp.ClientSession() as session:
             async with session.get(video_url) as response:
@@ -272,7 +366,24 @@ class YouTubePing(commands.Cog):
                     content_details = video_info['contentDetails']
                     statistics = video_info['statistics']
 
-                    duration_iso = content_details['duration']
+                    # Zjistíme, zda je to live stream
+                    is_live = False
+                    scheduled_start_time = None
+                    actual_start_time = None
+
+                    if 'liveStreamingDetails' in video_info:
+                        live_details = video_info['liveStreamingDetails']
+
+                        # Kontrola, zda je to aktivní live stream
+                        if live_details.get('actualEndTime') is None and (
+                            live_details.get('actualStartTime') is not None or
+                            live_details.get('scheduledStartTime') is not None
+                        ):
+                            is_live = True
+                            scheduled_start_time = live_details.get('scheduledStartTime')
+                            actual_start_time = live_details.get('actualStartTime')
+
+                    duration_iso = content_details.get('duration', 'PT0S')
                     duration = self.parse_duration(duration_iso)
 
                     return {
@@ -285,7 +396,10 @@ class YouTubePing(commands.Cog):
                         'views': statistics.get('viewCount', '0'),
                         'likes': statistics.get('likeCount', '0'),
                         'comments': statistics.get('commentCount', '0'),
-                        'channel_title': snippet['channelTitle']
+                        'channel_title': snippet['channelTitle'],
+                        'is_live': is_live,
+                        'scheduled_start_time': scheduled_start_time,
+                        'actual_start_time': actual_start_time
                     }
                 return None
 
@@ -298,30 +412,71 @@ class YouTubePing(commands.Cog):
             else:
                 short_description += "..."
 
+        # Určíme barvu podle typu obsahu (červená pro videa, purpurová pro live streamy)
+        color = discord.Color.purple() if video.get('is_live', False) else discord.Color.red()
+
         embed = discord.Embed(
             title=video['title'],
             description=short_description,
-            color=discord.Color.red(),
+            color=color,
             url=f"https://www.youtube.com/watch?v={video['id']}"
         )
 
         channel_url = f"https://www.youtube.com/{YOUTUBE_CHANNEL}" if IS_USERNAME else f"https://www.youtube.com/channel/{YOUTUBE_CHANNEL}"
 
+        # Upravíme název podle typu obsahu
+        if video.get('is_live', False):
+            author_name = f"Live stream od {video['channel_title']}"
+        else:
+            author_name = f"Video od {video['channel_title']}"
+
         embed.set_author(
-            name=f"Video od {video['channel_title']}",
+            name=author_name,
             icon_url="https://s.ytimg.com/yts/img/favicon_144-vfliLAfaB.png",
             url=channel_url
         )
 
         embed.set_image(url=video['thumbnail'])
 
-        embed.add_field(name="Délka videa", value=f"`{video['duration']}`", inline=True)
-        embed.add_field(name="Zhlédnutí", value=f"`{int(video['views']):,}`".replace(',', ' '), inline=True)
-        embed.add_field(name="Lajky", value=f"`{int(video['likes']):,}`".replace(',', ' '), inline=True)
+        # Přidáme různá pole podle typu obsahu
+        if video.get('is_live', False):
+            embed.add_field(name="Typ", value="`🔴 ŽIVĚ`", inline=True)
+            embed.add_field(name="Zhlédnutí", value=f"`{int(video['views']):,}`".replace(',', ' '), inline=True)
 
+            # Pokud máme informaci o začátku streamu, zobrazíme ji
+            if video.get('actual_start_time'):
+                start_time = datetime.datetime.fromisoformat(video['actual_start_time'].replace('Z', '+00:00'))
+                time_diff = datetime.datetime.now(datetime.timezone.utc) - start_time
+                hours = int(time_diff.total_seconds() // 3600)
+                minutes = int((time_diff.total_seconds() % 3600) // 60)
+
+                if hours > 0:
+                    duration_str = f"{hours}h {minutes}m"
+                else:
+                    duration_str = f"{minutes}m"
+
+                embed.add_field(name="Trvání streamu", value=f"`{duration_str}`", inline=True)
+        else:
+            embed.add_field(name="Délka videa", value=f"`{video['duration']}`", inline=True)
+            embed.add_field(name="Zhlédnutí", value=f"`{int(video['views']):,}`".replace(',', ' '), inline=True)
+            embed.add_field(name="Lajky", value=f"`{int(video['likes']):,}`".replace(',', ' '), inline=True)
+
+        # Nastavíme patičku podle typu obsahu
         published_time = datetime.datetime.fromisoformat(video['published_at'].replace('Z', '+00:00'))
-        embed.set_footer(text=f"Video ID: {video['id']} • Publikováno")
-        embed.timestamp = published_time
+
+        if video.get('is_live', False):
+            if video.get('actual_start_time'):
+                embed.set_footer(text=f"Stream ID: {video['id']} • Stream začal")
+                embed.timestamp = datetime.datetime.fromisoformat(video['actual_start_time'].replace('Z', '+00:00'))
+            else:
+                embed.set_footer(text=f"Stream ID: {video['id']} • Naplánováno na")
+                if video.get('scheduled_start_time'):
+                    embed.timestamp = datetime.datetime.fromisoformat(video['scheduled_start_time'].replace('Z', '+00:00'))
+                else:
+                    embed.timestamp = published_time
+        else:
+            embed.set_footer(text=f"Video ID: {video['id']} • Publikováno")
+            embed.timestamp = published_time
 
         return embed
 

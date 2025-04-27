@@ -38,7 +38,7 @@ def save_video(video_data, message_id=None, channel_message_id=None):
             break
 
     if existing_video:
-        videos[existing_index].update({
+        update_data = {
             "title": video_data['title'],
             "description": video_data['description'],
             "thumbnail_url": video_data['thumbnail'],
@@ -47,7 +47,19 @@ def save_video(video_data, message_id=None, channel_message_id=None):
             "likes": int(video_data['likes']),
             "comments": int(video_data['comments']),
             "last_updated": now
-        })
+        }
+
+        # Přidáme informace o live streamu, pokud existují
+        if 'is_live' in video_data:
+            update_data["is_live"] = video_data['is_live']
+
+        if 'scheduled_start_time' in video_data and video_data['scheduled_start_time']:
+            update_data["scheduled_start_time"] = video_data['scheduled_start_time']
+
+        if 'actual_start_time' in video_data and video_data['actual_start_time']:
+            update_data["actual_start_time"] = video_data['actual_start_time']
+
+        videos[existing_index].update(update_data)
     else:
         new_video = {
             "video_id": video_data['id'],
@@ -65,6 +77,16 @@ def save_video(video_data, message_id=None, channel_message_id=None):
             "announced_at": now if message_id else None,
             "last_updated": now
         }
+
+        # Přidáme informace o live streamu, pokud existují
+        if 'is_live' in video_data:
+            new_video["is_live"] = video_data['is_live']
+
+        if 'scheduled_start_time' in video_data and video_data['scheduled_start_time']:
+            new_video["scheduled_start_time"] = video_data['scheduled_start_time']
+
+        if 'actual_start_time' in video_data and video_data['actual_start_time']:
+            new_video["actual_start_time"] = video_data['actual_start_time']
         videos.append(new_video)
 
     _save_db(db)

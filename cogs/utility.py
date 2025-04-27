@@ -1,23 +1,12 @@
-import os
 import time
 import datetime
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
+from utils import config
 
-load_dotenv()
-YOUTUBE_CHANNEL = os.getenv('YOUTUBE_CHANNEL_ID')
-try:
-    YOUTUBE_NOTIFICATION_CHANNEL_ID = int(os.getenv('YOUTUBE_NOTIFICATION_CHANNEL_ID', 0))
-except ValueError:
-    YOUTUBE_NOTIFICATION_CHANNEL_ID = 0
-    print("Warning: Invalid YOUTUBE_NOTIFICATION_CHANNEL_ID in .env file")
-
-try:
-    WELCOME_CHANNEL_ID = int(os.getenv('WELCOME_CHANNEL_ID', 0))
-except ValueError:
-    WELCOME_CHANNEL_ID = 0
-    print("Warning: Invalid WELCOME_CHANNEL_ID in .env file")
+YOUTUBE_CHANNEL = config.get('YOUTUBE_CHANNEL_ID')
+YOUTUBE_NOTIFICATION_CHANNEL_ID = config.get_int('YOUTUBE_NOTIFICATION_CHANNEL_ID')
+WELCOME_CHANNEL_ID = config.get_int('WELCOME_CHANNEL_ID')
 
 START_TIME = time.time()
 
@@ -173,7 +162,7 @@ class Utility(commands.Cog):
                 youtube_commands[cmd_name] = cmd_desc
             elif command.name in ["count", "countstats", "countrules", "countreset"]:
                 counting_commands[cmd_name] = cmd_desc
-            elif command.name in ["aiscore", "aitop", "aibottom", "airules", "aireset", "airesetall"]:
+            elif command.name in ["aiscore", "aitop", "aibottom", "airules", "aireset", "airesetall", "aicheck"]:
                 ai_commands[cmd_name] = cmd_desc
             elif command.name in ["timeout", "untimeout", "unmute", "ban", "unban"]:
                 moderation_commands[cmd_name] = cmd_desc
@@ -331,96 +320,125 @@ class Utility(commands.Cog):
 
     @commands.command(name="pravidla")
     @commands.has_permissions(administrator=True)
-    async def server_rules(self, ctx, channel_id: str = None):
-        """Zobrazí pravidla serveru ve dvou embedech (admin only)"""
+    async def server_rules(self, ctx, target_info: str = None):
+        """Zobrazí pravidla serveru v embedu (admin only)
+
+        Použití:
+        !pravidla - odešle pravidla do aktuálního kanálu
+        !pravidla 123456789 - odešle pravidla do kanálu s ID 123456789
+        !pravidla 123456789_987654321 - upraví zprávu s ID 987654321 v kanálu s ID 123456789
+        """
         # Smazání zprávy s příkazem
         try:
             await ctx.message.delete()
         except Exception as e:
             print(f"Chyba při mazání zprávy: {str(e)}")
 
-        # Určení cílového kanálu
+        # Určení cílového kanálu a případně ID zprávy k editaci
         target_channel = None
-        if channel_id:
-            try:
-                channel_id = int(channel_id)
-                target_channel = self.bot.get_channel(channel_id)
-            except ValueError:
-                await ctx.send("Neplatné ID kanálu. Zadej platné číselné ID.", ephemeral=True)
-                return
+        message_id = None
+
+        if target_info:
+            # Kontrola, zda obsahuje ID zprávy k editaci
+            if "_" in target_info:
+                channel_id_str, message_id_str = target_info.split("_", 1)
+                try:
+                    channel_id = int(channel_id_str)
+                    message_id = int(message_id_str)
+                    target_channel = self.bot.get_channel(channel_id)
+                except ValueError:
+                    await ctx.send("Neplatný formát. Použijte formát: ID_kanálu_ID_zprávy", ephemeral=True)
+                    return
+            else:
+                # Pouze ID kanálu
+                try:
+                    channel_id = int(target_info)
+                    target_channel = self.bot.get_channel(channel_id)
+                except ValueError:
+                    await ctx.send("Neplatné ID kanálu. Zadej platné číselné ID.", ephemeral=True)
+                    return
 
         if not target_channel:
             target_channel = ctx.channel
 
-        # Vytvoření embedu s obecnými pravidly
-        general_rules_embed = discord.Embed(
+        # Vytvoření embedu s pravidly serveru
+        rules_embed = discord.Embed(
             title="📜 Pravidla serveru",
             description="Prosím, dodržujte tato pravidla pro udržení přátelské a bezpečné komunity.",
             color=discord.Color.blue()
         )
 
-        general_rules_embed.add_field(
-            name="1. Buďte k sobě slušní",
-            value="Chovejte se k ostatním s respektem. Není tolerováno obtěžování, ublížení nebo jiné nevhodné chování.",
+        # Obecná pravidla
+        rules_embed.add_field(
+            name="Obecná pravidla:",
+            value="• Chovejte se slušně a respektujte ostatní.\n"
+                  "• Nespamujte ani neposílejte nevhodný obsah.\n"
+                  "• Komunita je zde proto, abychom si vzájemně pomáhali a učili se.",
             inline=False
         )
 
-        general_rules_embed.add_field(
-            name="2. Žádné nevhodné nebo urážlivé obsah",
-            value="Nezveřejňujte obsah, který je sexuální, násilný, rasistický nebo jinak nevhodný.",
+        # Kanály a jejich účel
+        rules_embed.add_field(
+            name="Kanály a jejich účel:",
+            value="⁠💬│obecná-diskuse  Obecná konverzace o čemkoliv\n\n"
+                  "⁠🤖│ai-novinky-články  Výhradně novinky, články a odkazy ze světa AI. Diskuze k příspěvkům je vítaná, obecný off-topic sem nepatří.\n\n"
+                  "⁠🔧│ai-nástroje  Příspěvky týkající se nástrojů používající AI.\n\n"
+                  "⁠🧠│ai-modely  Příspěvky a diskuze o modelech umělé inteligence.\n\n"
+                  "⁠💻│ai-hardware  Informace a diskuze o hardware určeném pro AI.\n\n"
+                  "⁠🎧│robotovo-rapy  AI generované audio nahrávky.\n\n"
+                  "⁠🎨│ai-výtvory  Sdílení a komentáře k výtvorům generovaným AI.\n\n"
+                  "⁠📚│ai-tutoriály  Sdílení tutoriálů a návodů spojených s AI. Diskuze výhradně přes vlákna (použij \"Vytvořit vlákno\") nebo přes zkopírovaný odkaz na zprávu do diskuzních místností.\n\n"
+                  "⁠💻│kódování  Dotazy, diskuze o programování a technických problémech.\n\n"
+                  "⁠❓│dotazy-a-pomoc  Výhradně technické dotazy a pomoc s problémy.\n\n"
+                  "⁠🚀｜navajbeno  Ukázky hotových naprogramovaných projektů. Diskuze výhradně přes vlákna (použij \"Vytvořit vlákno\") nebo přes zkopírovaný odkaz na zprávu do diskuzních místností.",
             inline=False
         )
 
-        general_rules_embed.add_field(
-            name="3. Žádný spam nebo sebepropagace",
-            value="Nezahlcujte kanály opakovanými zprávami nebo nevhodnými odkazy. Sebepropagace je povolena pouze v určených kanálech.",
+        # Závěrečná poznámka
+        rules_embed.add_field(
+            name="Závěrečné poznámky:",
+            value="• Dodržujte prosím témata jednotlivých místností.\n"
+                  "• Pokud máte návrh na doplnění pravidel, založte prosím vlákno z tohoto příspěvku nebo mě označte v obecné diskusi.",
             inline=False
         )
 
-        general_rules_embed.add_field(
-            name="4. Používejte správné kanály",
-            value="Posílejte zprávy do odpovídajících kanálů podle jejich tématu.",
+        # AI Hlídač - Pravidla a bodování
+        rules_embed.add_field(
+            name="🤖 AI Hlídač - Pravidla a bodování",
+            value="Náš server používá AI systém pro hodnocení chování uživatelů. Zde je vysvětlení, jak funguje:",
             inline=False
         )
 
-        general_rules_embed.add_field(
-            name="5. Respektujte moderátory",
-            value="Moderátoři jsou zde, aby udržovali pořádek. Respektujte jejich rozhodnutí a pokyny.",
-            inline=False
-        )
+        # Načtení hodnot z konfigurace
+        from cogs.ai_moderation import AI_MESSAGES_BATCH, AI_MODEL, AI_MODERATION_INTERVAL_MINUTES
+        from cogs.ai_moderation import AI_POSITIVE_THRESHOLD_1, AI_POSITIVE_THRESHOLD_2, AI_POSITIVE_THRESHOLD_3
+        from cogs.ai_moderation import AI_NEGATIVE_THRESHOLD, AI_VERY_NEGATIVE_THRESHOLD, AI_NEGATIVE_PENALTY
 
-        general_rules_embed.set_footer(text="Porušení pravidel může vést k varovaní, dočasnému nebo trvalému zabanování.")
-
-        # Vytvoření embedu s pravidly AI hlídače
-        ai_rules_embed = discord.Embed(
-            title="🤖 AI Hlídač - Pravidla a bodování",
-            description="Náš server používá AI systém pro hodnocení chování uživatelů. Zde je vysvětlení, jak funguje:",
-            color=discord.Color.purple()
-        )
-
-        ai_rules_embed.add_field(
+        rules_embed.add_field(
             name="💬 Analýza zpráv",
-            value="AI analyzuje vaše zprávy a hodnotit jejich sentiment (pozitivní nebo negativní). Za pozitivní komunikaci získáváte body, za negativní je ztrácíte.",
+            value=f"AI analyzuje **{AI_MESSAGES_BATCH}** zpráv od každého uživatele najednou pomocí modelu **{AI_MODEL}**.\n"
+                  f"Kontrola probíhá každých **{AI_MODERATION_INTERVAL_MINUTES}** minut.\n"
+                  f"Za pozitivní komunikaci získáváte body, za negativní je ztrácíte.",
             inline=False
         )
 
-        ai_rules_embed.add_field(
+        rules_embed.add_field(
             name="🌟 Odměny za pozitivní chování",
-            value="**Úroveň 1:** 800+ bodů - získáte speciální roli\n"
-                  "**Úroveň 2:** 2000+ bodů - získáte pokročilejší roli\n"
-                  "**Úroveň 3:** 5000+ bodů - získáte nejvyšší roli",
+            value=f"**Úroveň 1:** {AI_POSITIVE_THRESHOLD_1}+ bodů - získáte speciální roli\n"
+                  f"**Úroveň 2:** {AI_POSITIVE_THRESHOLD_2}+ bodů - získáte pokročilejší roli\n"
+                  f"**Úroveň 3:** {AI_POSITIVE_THRESHOLD_3}+ bodů - získáte nejvyšší roli",
             inline=False
         )
 
-        ai_rules_embed.add_field(
+        rules_embed.add_field(
             name="⚠️ Postihy za negativní chování",
-            value="**Timeout:** -30 bodů - dočasný timeout\n"
-                  "**Negativní role:** -1000 bodů - přidělení negativní role\n"
-                  "**Extra postih:** -50 bodů za každou velmi negativní zprávu",
+            value=f"**Upozornění moderátorům:** {AI_NEGATIVE_THRESHOLD} bodů\n"
+                  f"**Negativní role:** {AI_VERY_NEGATIVE_THRESHOLD} bodů - přidělení negativní role\n"
+                  f"**Extra postih:** {AI_NEGATIVE_PENALTY} bodů za každou velmi negativní zprávu",
             inline=False
         )
 
-        ai_rules_embed.add_field(
+        rules_embed.add_field(
             name="📊 Kontrola vašeho skóre",
             value="Použijte příkaz `!aiscore` pro zobrazení vašeho aktuálního skóre.\n"
                   "`!aitop` zobrazí žebříček nejlepších uživatelů.\n"
@@ -428,26 +446,28 @@ class Utility(commands.Cog):
             inline=False
         )
 
-        ai_rules_embed.add_field(
-            name="🔍 Sledované chování",
-            value="AI sleduje zejména:\n"
-                  "- Urážlivý jazyk a nadávky\n"
-                  "- Rasistické a diskriminační výrazy\n"
-                  "- Obtěžování a vyhrožování\n"
-                  "- Pozitivní a nápomocné příspěvky\n"
-                  "- Přátelské a konstruktivní diskuze",
-            inline=False
-        )
+        rules_embed.set_footer(text="Porušení pravidel může vést k varovaní, dočasnému nebo trvalému zabanování.")
 
-        ai_rules_embed.set_footer(text="AI moderátor je zde, aby pomohl udržet přátelskou atmosféru, ne aby vás trestal. Buďte k sobě milí!")
+        # Odeslání nebo editace embedu
+        if message_id:
+            try:
+                # Pokus o získání zprávy k editaci
+                message = await target_channel.fetch_message(message_id)
+                await message.edit(embed=rules_embed)
+                await ctx.send(f"Pravidla byla aktualizována v kanálu {target_channel.mention}.", ephemeral=True)
+            except discord.NotFound:
+                await ctx.send(f"Zpráva s ID {message_id} nebyla nalezena v kanálu {target_channel.mention}.", ephemeral=True)
+            except discord.Forbidden:
+                await ctx.send(f"Nemám oprávnění upravit zprávu v kanálu {target_channel.mention}.", ephemeral=True)
+            except Exception as e:
+                await ctx.send(f"Chyba při úpravě zprávy: {str(e)}", ephemeral=True)
+        else:
+            # Odeslání nové zprávy s pravidly
+            await target_channel.send(embed=rules_embed)
 
-        # Odeslání embedů
-        await target_channel.send(embed=general_rules_embed)
-        await target_channel.send(embed=ai_rules_embed)
-
-        # Potvrzení pro admina
-        if target_channel != ctx.channel:
-            await ctx.send(f"Pravidla byla odeslána do kanálu {target_channel.mention}.", ephemeral=True)
+            # Potvrzení pro admina
+            if target_channel != ctx.channel:
+                await ctx.send(f"Pravidla byla odeslána do kanálu {target_channel.mention}.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Utility(bot))

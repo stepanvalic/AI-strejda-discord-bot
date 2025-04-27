@@ -1,12 +1,10 @@
 import discord
 from discord.ext import commands, tasks
-import os
-from dotenv import load_dotenv
+from utils import config
 
-load_dotenv()
-GUILD_ID = int(os.getenv('GUILD_ID', 0))
-ACTIVITY_BASE_TEXT = os.getenv('ACTIVITY_BASE_TEXT', 'Sleduji')
-ACTIVITY_FORMAT_TEXT = os.getenv('ACTIVITY_FORMAT_TEXT', '{count} darebáků')
+GUILD_ID = config.get_int('GUILD_ID')
+ACTIVITY_BASE_TEXT = config.get('ACTIVITY_BASE_TEXT', 'Sleduji')
+ACTIVITY_FORMAT_TEXT = config.get('ACTIVITY_FORMAT_TEXT', '{count} darebáků')
 
 class BotActivity(commands.Cog):
     def __init__(self, bot):

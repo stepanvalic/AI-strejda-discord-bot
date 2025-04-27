@@ -1,18 +1,32 @@
-# Environment variables
-.env
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
 
-# Python virtual environment
+# Virtual environments
+.venv/
 venv/
 env/
 
-# Database files
+# Sensitive information
+.env
+
+# Database files (except db/sumar/.gitkeep)
 db/*.json
+db/sumar/*.json
+db/*
+!db/sumar/
+!db/sumar/.gitkeep
 
 # Log files
-log/
+log/*.log
 
-# OS specific files
-.DS_Store
-Thumbs.db
+# IDE files
+.vscode/
+.idea/
 
-__pycache__
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
