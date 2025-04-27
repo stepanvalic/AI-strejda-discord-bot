@@ -289,7 +289,7 @@ class ChatSummary(commands.Cog):
                     print(f"[Summary] Initializing OpenAI client with DeepSeek API base URL")
                     client = OpenAI(
                         api_key=DEEPSEEK_API_KEY,
-                        base_url="https://api.deepseek.com"  # Changed from "https://api.deepseek.com/v1"
+                        base_url="https://api.deepseek.com/v3"  # Changed from "https://api.deepseek.com/v1"
                     )
 
                     # Prepare messages for API
