@@ -354,15 +354,42 @@ class Counting(commands.Cog):
                 pass
             return
 
+        # Nejprve zkusíme zpracovat jako matematický výraz
         try:
-            count = int(message.content.strip(), 0)
-        except ValueError:
+            # Zkontrolujeme, zda zpráva obsahuje matematické operátory
+            content = message.content.strip()
+            if any(op in content for op in ['+', '-', '*', '/', '(', ')']):
+                # Bezpečné vyhodnocení matematického výrazu
+                # Nahradíme dělení // za / pro celočíselné dělení
+                content = content.replace('//', '/')
+                # Vyhodnotíme výraz - bezpečné vyhodnocení s prázdným kontextem
+                result = eval(content, {"__builtins__": {}}, {})
+                # Zaokrouhlíme výsledek dolů na celé číslo
+                count = int(result)
+                # Pokud je výsledek desetinné číslo, zkontrolujeme, zda je blízko celému číslu
+                if isinstance(result, float) and abs(result - count) > 0.0001:
+                    # Pokud je výsledek desetinné číslo, které není blízko celému číslu, zobrazíme upozornění
+                    await message.channel.send(
+                        f"**{message.author.display_name}**, výsledek výrazu `{content}` je `{result}`, "
+                        f"což bylo zaokrouhleno na `{count}`.",
+                        delete_after=5
+                    )
+            else:
+                # Pokud zpráva neobsahuje matematické operátory, zpracujeme ji jako běžné číslo
+                count = int(content, 0)
+        except (ValueError, SyntaxError, NameError, ZeroDivisionError, TypeError) as e:
             if not is_admin:
                 try:
                     await message.delete()
 
+                    error_msg = "V kanálu pro počítání jsou povolena pouze čísla a jednoduché matematické výrazy (sčítání, odčítání, násobení, dělení)."
+                    if isinstance(e, ZeroDivisionError):
+                        error_msg = "Nelze dělit nulou."
+                    elif isinstance(e, SyntaxError):
+                        error_msg = "Neplatný matematický výraz."
+
                     try:
-                        await message.author.send(f"V kanálu pro počítání jsou povolena pouze čísla. Vaše zpráva byla smazána.")
+                        await message.author.send(f"{error_msg} Vaše zpráva byla smazána.")
                     except:
                         # Získání nebo vytvoření webhooků
                         webhook = await self.get_or_create_webhook(message.channel)
@@ -370,14 +397,14 @@ class Counting(commands.Cog):
                         if webhook:
                             # Pošleme zprávu přes webhook
                             await webhook.send(
-                                content=f"V tomto kanálu jsou povolena pouze čísla.",
+                                content=error_msg,
                                 username=message.author.display_name,
                                 avatar_url=message.author.display_avatar.url
                             )
                         else:
                             # Fallback na normální zprávu
                             await message.channel.send(
-                                f"<@{message.author.id}> V tomto kanálu jsou povolena pouze čísla.",
+                                f"<@{message.author.id}> {error_msg}",
                                 delete_after=2
                             )
 
@@ -834,7 +861,9 @@ class Counting(commands.Cog):
             "Počítejte od 1 do nekonečna, každé číslo musí být o 1 větší než předchozí",
             "Jeden člověk nemůže počítat dvakrát za sebou (je potřeba alespoň dva účastníky)",
             "Pokud někdo napíše špatné číslo, počítání se resetuje na 0",
-            "V kanálu jsou povolena pouze čísla, ostatní zprávy budou smazány (kromě adminů)",
+            "V kanálu jsou povolena pouze čísla a matematické výrazy, ostatní zprávy budou smazány (kromě adminů)",
+            "Můžete používat základní matematické operace: sčítání (+), odčítání (-), násobení (*) a dělení (/)",
+            "Výsledek matematického výrazu musí být celé číslo odpovídající dalšímu číslu v pořadí",
             "Upravování nebo mazání zpráv není povoleno - bot obnoví smazané nebo upravené zprávy",
             f"Pokud pokazíte počítání {FIRST_BAN_THRESHOLD}x za sebou, budete zablokováni na {FIRST_BAN_DURATION} den",
             f"Pokud po odblokování pokazíte počítání znovu {SECOND_BAN_THRESHOLD}x, budete zablokováni na {SECOND_BAN_DURATION} dny",
@@ -1050,8 +1079,8 @@ class Counting(commands.Cog):
             print(f"Chyba při mazání zprávy: {str(e)}")
 
         embed = discord.Embed(
-            title="🔢 Podporované formáty čísel",
-            description="Při počítání můžete zadávat čísla v následujících formátech:",
+            title="🔢 Podporované formáty čísel a výrazů",
+            description="Při počítání můžete zadávat čísla v následujících formátech nebo používat matematické výrazy:",
             color=discord.Color.light_grey()
         )
 
@@ -1073,6 +1102,42 @@ class Counting(commands.Cog):
         embed.add_field(
             name="Osmičková (Octal)",
             value="Čísla začínající prefixem `0o`.\n*Příklad:* `0o17` (rovno 15)",
+            inline=False
+        )
+
+        embed.add_field(
+            name="📊 Matematické operace",
+            value="Nyní můžete používat i základní matematické operace!\nVýsledek musí být celé číslo odpovídající dalšímu číslu v pořadí.",
+            inline=False
+        )
+
+        embed.add_field(
+            name="➕ Sčítání",
+            value="*Příklad:* `10+5` (rovno 15)",
+            inline=True
+        )
+
+        embed.add_field(
+            name="➖ Odčítání",
+            value="*Příklad:* `20-5` (rovno 15)",
+            inline=True
+        )
+
+        embed.add_field(
+            name="✖️ Násobení",
+            value="*Příklad:* `3*5` (rovno 15)",
+            inline=True
+        )
+
+        embed.add_field(
+            name="➗ Dělení",
+            value="*Příklad:* `30/2` (rovno 15)\nPozn.: Výsledek je zaokrouhlen na celé číslo.",
+            inline=True
+        )
+
+        embed.add_field(
+            name="🔣 Kombinované výrazy",
+            value="Můžete kombinovat více operací a používat závorky.\n*Příklad:* `(4+3)*2` (rovno 14)",
             inline=False
         )
 
