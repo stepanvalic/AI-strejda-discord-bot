@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands, tasks
 import aiohttp
+import asyncio
 import datetime
 from datetime import timedelta
 from utils import db, config
@@ -13,12 +14,19 @@ YOUTUBE_USERNAME = YOUTUBE_CHANNEL if IS_USERNAME else None
 YOUTUBE_CHANNEL_ID = None if IS_USERNAME else YOUTUBE_CHANNEL
 
 YOUTUBE_NOTIFICATION_CHANNEL_ID = config.get_int('YOUTUBE_NOTIFICATION_CHANNEL_ID')
+YOUTUBE_PING_ROLE_ID = config.get_int('YOUTUBE_PING_ROLE_ID', 0)
 
 CHECK_INTERVAL_SECONDS = config.get_int('CHECK_INTERVAL_SECONDS', 30)
 
 # Maximum age of a video to be considered "new" when the bot starts (in hours)
 # This helps catch videos published while the bot was offline
 NEW_VIDEO_MAX_AGE_HOURS = config.get_int('NEW_VIDEO_MAX_AGE_HOURS', 24)
+
+# Nastavení pro odložené notifikace
+NOTIFICATION_DELAY_ENABLED = config.get_bool('YOUTUBE_NOTIFICATION_DELAY_ENABLED', False)
+NOTIFICATION_DELAY_START_HOUR = config.get_int('YOUTUBE_NOTIFICATION_DELAY_START_HOUR', 0)
+NOTIFICATION_DELAY_END_HOUR = config.get_int('YOUTUBE_NOTIFICATION_DELAY_END_HOUR', 9)
+NOTIFICATION_DELAY_UNTIL_HOUR = config.get_int('YOUTUBE_NOTIFICATION_DELAY_UNTIL_HOUR', 9)
 
 UPDATE_INTERVAL_SECONDS = 30 * 60
 
@@ -249,6 +257,33 @@ class YouTubePing(commands.Cog):
             await self.send_notification(video)
 
     async def send_notification(self, video):
+        # Kontrola, zda má být notifikace odložena
+        if NOTIFICATION_DELAY_ENABLED and not video.get('is_live', False):
+            # Převedeme čas publikování na lokální čas
+            published_time = datetime.datetime.fromisoformat(video['published_at'].replace('Z', '+00:00'))
+            local_time = published_time.astimezone()
+
+            # Zkontrolujeme, zda je čas publikování v rozmezí pro odložení
+            current_hour = local_time.hour
+            if NOTIFICATION_DELAY_START_HOUR <= current_hour < NOTIFICATION_DELAY_END_HOUR:
+                print(f"[YouTube] Video '{video['title']}' bylo publikováno v {current_hour}:00, notifikace bude odložena na {NOTIFICATION_DELAY_UNTIL_HOUR}:00")
+
+                # Vypočítáme čas, kdy má být notifikace odeslána
+                now = datetime.datetime.now()
+                target_time = now.replace(hour=NOTIFICATION_DELAY_UNTIL_HOUR, minute=0, second=0, microsecond=0)
+
+                # Pokud je cílový čas v minulosti, přidáme 1 den
+                if target_time < now:
+                    target_time = target_time + datetime.timedelta(days=1)
+
+                # Vypočítáme, kolik sekund máme čekat
+                delay_seconds = (target_time - now).total_seconds()
+
+                # Naplánujeme odloženou notifikaci
+                print(f"[YouTube] Notifikace pro video '{video['title']}' bude odeslána za {delay_seconds} sekund")
+                await asyncio.sleep(delay_seconds)
+                print(f"[YouTube] Odesílám odloženou notifikaci pro video '{video['title']}'")
+
         channel = self.bot.get_channel(YOUTUBE_NOTIFICATION_CHANNEL_ID)
 
         if not channel:
@@ -276,9 +311,13 @@ class YouTubePing(commands.Cog):
         # Přidáme různý obsah zprávy podle typu
         if video.get('is_live', False):
             if video.get('actual_start_time'):
-                content = f"@everyone {video['channel_title']} právě vysílá živě! Připojte se ke streamu!"
+                # Pro živé vysílání použijeme roli nebo @everyone
+                if YOUTUBE_PING_ROLE_ID:
+                    content = f"<@&{YOUTUBE_PING_ROLE_ID}> {video['channel_title']} právě vysílá živě! Připojte se ke streamu!"
+                else:
+                    content = f"@everyone {video['channel_title']} právě vysílá živě! Připojte se ke streamu!"
             else:
-                # Pro naplánované streamy nepoužíváme @everyone
+                # Pro naplánované streamy nepoužíváme @everyone ani roli
                 scheduled_time = None
                 if video.get('scheduled_start_time'):
                     scheduled_time = datetime.datetime.fromisoformat(video['scheduled_start_time'].replace('Z', '+00:00'))
@@ -289,7 +328,11 @@ class YouTubePing(commands.Cog):
                 else:
                     content = f"{video['channel_title']} naplánoval živé vysílání!"
         else:
-            content = f"@everyone Nové video od {video['channel_title']}!"
+            # Pro běžná videa použijeme roli nebo @everyone
+            if YOUTUBE_PING_ROLE_ID:
+                content = f"<@&{YOUTUBE_PING_ROLE_ID}> Nové video od {video['channel_title']}!"
+            else:
+                content = f"@everyone Nové video od {video['channel_title']}!"
 
         message = await channel.send(
             content=content,
