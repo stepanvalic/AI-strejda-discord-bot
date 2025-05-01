@@ -22,11 +22,11 @@ CHECK_INTERVAL_SECONDS = config.get_int('CHECK_INTERVAL_SECONDS', 30)
 # This helps catch videos published while the bot was offline
 NEW_VIDEO_MAX_AGE_HOURS = config.get_int('NEW_VIDEO_MAX_AGE_HOURS', 24)
 
-# Nastavení pro odložené notifikace
-NOTIFICATION_DELAY_ENABLED = config.get_bool('YOUTUBE_NOTIFICATION_DELAY_ENABLED', False)
-NOTIFICATION_DELAY_START_HOUR = config.get_int('YOUTUBE_NOTIFICATION_DELAY_START_HOUR', 0)
-NOTIFICATION_DELAY_END_HOUR = config.get_int('YOUTUBE_NOTIFICATION_DELAY_END_HOUR', 9)
-NOTIFICATION_DELAY_UNTIL_HOUR = config.get_int('YOUTUBE_NOTIFICATION_DELAY_UNTIL_HOUR', 9)
+# Nastavení pro odložené notifikace - nyní vždy vypnuto
+NOTIFICATION_DELAY_ENABLED = False  # Natvrdo nastaveno na False, aby se notifikace vždy odesílaly okamžitě
+NOTIFICATION_DELAY_START_HOUR = 0
+NOTIFICATION_DELAY_END_HOUR = 0
+NOTIFICATION_DELAY_UNTIL_HOUR = 0
 
 UPDATE_INTERVAL_SECONDS = 30 * 60
 
@@ -257,33 +257,10 @@ class YouTubePing(commands.Cog):
             await self.send_notification(video)
 
     async def send_notification(self, video):
-        # Kontrola, zda má být notifikace odložena
-        if NOTIFICATION_DELAY_ENABLED and not video.get('is_live', False):
-            # Převedeme čas publikování na lokální čas
-            published_time = datetime.datetime.fromisoformat(video['published_at'].replace('Z', '+00:00'))
-            local_time = published_time.astimezone()
-
-            # Zkontrolujeme, zda je čas publikování v rozmezí pro odložení
-            current_hour = local_time.hour
-            if NOTIFICATION_DELAY_START_HOUR <= current_hour < NOTIFICATION_DELAY_END_HOUR:
-                print(f"[YouTube] Video '{video['title']}' bylo publikováno v {current_hour}:00, notifikace bude odložena na {NOTIFICATION_DELAY_UNTIL_HOUR}:00")
-
-                # Vypočítáme čas, kdy má být notifikace odeslána
-                now = datetime.datetime.now()
-                target_time = now.replace(hour=NOTIFICATION_DELAY_UNTIL_HOUR, minute=0, second=0, microsecond=0)
-
-                # Pokud je cílový čas v minulosti, přidáme 1 den
-                if target_time < now:
-                    target_time = target_time + datetime.timedelta(days=1)
-
-                # Vypočítáme, kolik sekund máme čekat
-                delay_seconds = (target_time - now).total_seconds()
-
-                # Naplánujeme odloženou notifikaci
-                print(f"[YouTube] Notifikace pro video '{video['title']}' bude odeslána za {delay_seconds} sekund")
-                await asyncio.sleep(delay_seconds)
-                print(f"[YouTube] Odesílám odloženou notifikaci pro video '{video['title']}'")
-
+        # Odstraněna logika pro odložené notifikace - všechny notifikace budou odeslány okamžitě
+        # Přidáme pouze log pro informaci
+        print(f"[YouTube] Odesílám okamžitou notifikaci pro video '{video['title']}'")
+        
         channel = self.bot.get_channel(YOUTUBE_NOTIFICATION_CHANNEL_ID)
 
         if not channel:
