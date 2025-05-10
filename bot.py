@@ -56,8 +56,8 @@ async def load_extensions():
     await bot.load_extension("cogs.bot_activity")
     print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}bot_activity{Fore.MAGENTA} cog")
 
-    # YouTube ping cog byl odstraněn - bude implementován nový systém
-    print(f"{Fore.YELLOW}⚠️ YouTube ping cog byl odstraněn - bude implementován nový systém{Style.RESET_ALL}")
+    await bot.load_extension("cogs.youtube_ping")
+    print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}youtube_ping{Fore.MAGENTA} cog")
 
     await bot.load_extension("cogs.counting")
     print(f"{Fore.MAGENTA}✅ Loaded {Fore.CYAN}counting{Fore.MAGENTA} cog")
