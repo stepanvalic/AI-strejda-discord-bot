@@ -260,7 +260,7 @@ class YouTubePing(commands.Cog):
         # Odstraněna logika pro odložené notifikace - všechny notifikace budou odeslány okamžitě
         # Přidáme pouze log pro informaci
         print(f"[YouTube] Odesílám okamžitou notifikaci pro video '{video['title']}'")
-        
+
         channel = self.bot.get_channel(YOUTUBE_NOTIFICATION_CHANNEL_ID)
 
         if not channel:
