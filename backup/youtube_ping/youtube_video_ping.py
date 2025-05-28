@@ -16,7 +16,7 @@ YOUTUBE_CHANNEL_ID = None if IS_USERNAME else YOUTUBE_CHANNEL
 YOUTUBE_NOTIFICATION_CHANNEL_ID = config.get_int('YOUTUBE_NOTIFICATION_CHANNEL_ID')
 YOUTUBE_PING_ROLE_ID = config.get_int('YOUTUBE_PING_ROLE_ID', 0)
 
-CHECK_INTERVAL_SECONDS = config.get_int('CHECK_INTERVAL_SECONDS', 30)
+CHECK_INTERVAL_SECONDS = config.get_int('CHECK_INTERVAL_SECONDS', 15)
 
 # Maximum age of a video to be considered "new" when the bot starts (in hours)
 # This helps catch videos published while the bot was offline
@@ -216,38 +216,25 @@ class YouTubePing(commands.Cog):
                 self.last_video_id = video['id']
             return
 
-        # Special handling for first run to catch recent videos
+        # Simplified initialization - just set the last video ID on first run
         if not self.initialized:
             self.initialized = True
             announced_videos = db.get_announced_videos()
 
             if announced_videos:
-                # We have announced videos before, check if this one is new and recent
+                # We have announced videos before, use the latest one as reference
                 self.last_video_id = announced_videos[0]['video_id']
-
-                if video['id'] != self.last_video_id and self.is_video_recent(video['published_at']):
-                    print(f"Found recent new video during initialization: {video['title']}")
-                    self.last_video_id = video['id']
-                    await self.send_notification(video)
+                print(f"Initialized with last announced video: {self.last_video_id}")
             else:
-                # No videos have been announced yet, announce this one if it's recent
-                if self.is_video_recent(video['published_at']):
-                    print(f"Announcing first video during initialization: {video['title']}")
-                    self.last_video_id = video['id']
-                    await self.send_notification(video)
-                else:
-                    # Just save the ID without announcing if it's not recent
-                    self.last_video_id = video['id']
+                # No videos announced yet, set current video as reference without announcing
+                self.last_video_id = video['id']
+                print(f"First run - setting reference video: {video['id']}")
             return
-
-        # If we get here, we're past initialization
 
         # If last_video_id is still None (shouldn't happen, but just in case)
         if self.last_video_id is None:
             self.last_video_id = video['id']
-            # Only announce if it's recent
-            if self.is_video_recent(video['published_at']):
-                await self.send_notification(video)
+            print(f"Setting last_video_id to current video: {video['id']}")
             return
 
         # Normal operation - announce if it's a new video
