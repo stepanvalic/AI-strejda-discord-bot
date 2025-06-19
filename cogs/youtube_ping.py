@@ -35,6 +35,7 @@ class YouTubePing(commands.Cog):
         self.bot = bot
         self.last_video_id = None
         self.initialized = False
+        self.session = None
 
         db.ensure_db_exists()
 
@@ -44,6 +45,37 @@ class YouTubePing(commands.Cog):
     def cog_unload(self):
         self.check_uploads.cancel()
         self.update_embeds.cancel()
+        
+        # Close aiohttp session if it exists
+        if self.session and not self.session.closed:
+            asyncio.create_task(self._close_session())
+
+    async def _close_session(self):
+        """Safely close the aiohttp session"""
+        try:
+            if self.session and not self.session.closed:
+                await self.session.close()
+                # Wait a bit for the underlying connections to close
+                await asyncio.sleep(0.1)
+        except Exception as e:
+            print(f"Error closing aiohttp session: {e}")
+
+    async def _get_session(self):
+        """Get or create aiohttp session with proper timeout settings"""
+        if self.session is None or self.session.closed:
+            timeout = aiohttp.ClientTimeout(total=30, connect=10)
+            connector = aiohttp.TCPConnector(
+                limit=10,
+                limit_per_host=5,
+                ttl_dns_cache=300,
+                use_dns_cache=True,
+                ssl=False  # Disable SSL verification to avoid SSL timeout issues
+            )
+            self.session = aiohttp.ClientSession(
+                timeout=timeout,
+                connector=connector
+            )
+        return self.session
 
     async def get_channel_id_from_username(self, username):
         if username.startswith('@'):
@@ -51,7 +83,8 @@ class YouTubePing(commands.Cog):
 
         url = f"https://www.googleapis.com/youtube/v3/channels?key={YOUTUBE_API_KEY}&forUsername={username}&part=id"
 
-        async with aiohttp.ClientSession() as session:
+        session = await self._get_session()
+        try:
             async with session.get(url) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -72,7 +105,9 @@ class YouTubePing(commands.Cog):
                                             return item['snippet']['channelId']
 
                                     return search_data['items'][0]['snippet']['channelId']
-                return None
+        except Exception as e:
+            print(f"Error getting channel ID from username: {e}")
+        return None
 
     async def get_latest_video(self):
         channel_id = YOUTUBE_CHANNEL_ID
@@ -86,7 +121,8 @@ class YouTubePing(commands.Cog):
         # Hledáme videa i live streamy (type=video,live)
         search_url = f"https://www.googleapis.com/youtube/v3/search?key={YOUTUBE_API_KEY}&channelId={channel_id}&part=snippet,id&order=date&maxResults=5&type=video"
 
-        async with aiohttp.ClientSession() as session:
+        session = await self._get_session()
+        try:
             async with session.get(search_url) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -152,7 +188,9 @@ class YouTubePing(commands.Cog):
                                     'scheduled_start_time': scheduled_start_time,
                                     'actual_start_time': actual_start_time
                                 }
-                return None
+        except Exception as e:
+            print(f"Error getting latest video: {e}")
+        return None
 
     def parse_duration(self, duration_iso):
         duration = duration_iso[2:]
@@ -360,7 +398,8 @@ class YouTubePing(commands.Cog):
 
         video_url = f"https://www.googleapis.com/youtube/v3/videos?key={YOUTUBE_API_KEY}&id={video_id}&part=snippet,contentDetails,statistics,liveStreamingDetails"
 
-        async with aiohttp.ClientSession() as session:
+        session = await self._get_session()
+        try:
             async with session.get(video_url) as response:
                 if response.status == 200:
                     data = await response.json()
@@ -408,7 +447,9 @@ class YouTubePing(commands.Cog):
                         'scheduled_start_time': scheduled_start_time,
                         'actual_start_time': actual_start_time
                     }
-                return None
+        except Exception as e:
+            print(f"Error getting video details: {e}")
+        return None
 
     async def create_video_embed(self, video):
         short_description = video['description'][:200]
