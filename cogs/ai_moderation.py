@@ -268,7 +268,7 @@ Provide your analysis in the following JSON format:
             # Call the Gemini API
             response = await asyncio.to_thread(
                 genai_client.models.generate_content,
-                model=AI_MODEL,
+                AI_MODEL,
                 [
                     "You are an AI assistant that analyzes the sentiment of Discord messages. You detect toxic, negative, neutral, and positive content. Be extremely lenient and charitable in your analysis. Give users the benefit of the doubt and focus much more on positive aspects of messages than negative ones. Only flag content as very negative if it's clearly harmful, offensive, or toxic. Avoid penalizing users for casual banter, jokes, or mild criticism. Assume good intentions whenever possible. Your goal is to create a positive community atmosphere while only flagging truly problematic content.",
                     prompt
