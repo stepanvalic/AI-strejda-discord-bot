@@ -3,7 +3,7 @@ import json
 import discord
 import asyncio
 import datetime
-import google.generativeai as genai
+from google import genai
 from discord.ext import commands, tasks
 from utils import config, token_tracker
 
@@ -53,7 +53,11 @@ AI_POSITIVE_ROLE_ID_3 = config.get('AI_POSITIVE_ROLE_ID_3')
 AI_NEGATIVE_ROLE_ID = config.get('AI_NEGATIVE_ROLE_ID')
 
 # Configure Gemini API
-genai.configure(api_key=GEMINI_API_KEY)
+genai_client = None
+if GEMINI_API_KEY:
+    genai_client = genai.Client(api_key=GEMINI_API_KEY)
+else:
+    print("[AI Mod] ERROR: GEMINI_API_KEY is not set. AI moderation will not function properly.")
 
 # Convert role IDs to int if provided
 try:
@@ -250,24 +254,26 @@ Provide your analysis in the following JSON format:
 """
 
         try:
-            print(f"[AI Mod] Creating Gemini model instance with model: {AI_MODEL}")
-            # Create a Gemini model instance
-            model = genai.GenerativeModel(AI_MODEL)
+            print(f"[AI Mod] Preparing Gemini request with model: {AI_MODEL}")
+            if not genai_client:
+                print("[AI Mod] Gemini client is not initialized")
+                return None
 
             # Configure response format to be JSON
-            generation_config = genai.types.GenerationConfig(
+            generation_config = genai.types.GenerateContentConfig(
                 response_mime_type='application/json'
             )
 
             print("[AI Mod] Calling Gemini API...")
             # Call the Gemini API
             response = await asyncio.to_thread(
-                model.generate_content,
+                genai_client.models.generate_content,
+                model=AI_MODEL,
                 [
                     "You are an AI assistant that analyzes the sentiment of Discord messages. You detect toxic, negative, neutral, and positive content. Be extremely lenient and charitable in your analysis. Give users the benefit of the doubt and focus much more on positive aspects of messages than negative ones. Only flag content as very negative if it's clearly harmful, offensive, or toxic. Avoid penalizing users for casual banter, jokes, or mild criticism. Assume good intentions whenever possible. Your goal is to create a positive community atmosphere while only flagging truly problematic content.",
                     prompt
                 ],
-                generation_config=generation_config
+                config=generation_config
             )
 
             print("[AI Mod] Received response from Gemini API")
