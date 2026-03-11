@@ -7,6 +7,9 @@ from discord.ext import commands
 from utils import config
 
 COUNTING_CHANNEL_ID = config.get_int('COUNTING_CHANNEL_ID')
+
+def get_current_counting_channel_id():
+    return config.get_int('COUNTING_CHANNEL_ID', COUNTING_CHANNEL_ID)
 COUNTING_SAVE_FILE = config.get('COUNTING_SAVE_FILE', 'db/counting.json')
 COUNTING_TOPIC_PREFIX = config.get('COUNTING_TOPIC_PREFIX', 'Počítejte od 1 do nekonečna. Další číslo: ')
 
@@ -115,9 +118,10 @@ class Counting(commands.Cog):
         # Vytvoření override pro kanál, který zakáže uživateli posílat zprávy
         try:
             # Získání objektu kanálu
-            channel_obj = self.bot.get_channel(COUNTING_CHANNEL_ID)
+            counting_channel_id = get_current_counting_channel_id()
+            channel_obj = self.bot.get_channel(counting_channel_id)
             if not channel_obj:
-                print(f"Kanál s ID {COUNTING_CHANNEL_ID} nebyl nalezen")
+                print(f"Kanál s ID {counting_channel_id} nebyl nalezen")
                 return False
 
             # Vytvoření override pro uživatele
@@ -197,9 +201,9 @@ class Counting(commands.Cog):
     async def check_and_restore_blocks(self):
         """Kontroluje a obnovuje blokace uživatelů po restartu bota"""
         # Získání objektu kanálu
-        channel = self.bot.get_channel(COUNTING_CHANNEL_ID)
+        channel = self.bot.get_channel(get_current_counting_channel_id())
         if not channel:
-            print(f"Kanál s ID {COUNTING_CHANNEL_ID} nebyl nalezen")
+            print(f"Kanál s ID {get_current_counting_channel_id()} nebyl nalezen")
             return
 
         # Procházení všech blokovaných uživatelů
@@ -303,7 +307,7 @@ class Counting(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.channel.id != COUNTING_CHANNEL_ID:
+        if message.channel.id != get_current_counting_channel_id():
             return
 
         if message.author.bot:
@@ -496,7 +500,7 @@ class Counting(commands.Cog):
     async def on_message_edit(self, before, after):
         """Sleduje úpravy zpráv v kanálu počítání"""
         # Kontrola, zda je zpráva z kanálu počítání
-        if before.channel.id != COUNTING_CHANNEL_ID:
+        if before.channel.id != get_current_counting_channel_id():
             return
 
         # Ignorujeme zprávy od botů
@@ -549,7 +553,7 @@ class Counting(commands.Cog):
     async def on_message_delete(self, message):
         """Sleduje mazání zpráv v kanálu počítání"""
         # Kontrola, zda je zpráva z kanálu počítání
-        if message.channel.id != COUNTING_CHANNEL_ID:
+        if message.channel.id != get_current_counting_channel_id():
             return
 
         # Ignorujeme zprávy od botů
@@ -594,10 +598,10 @@ class Counting(commands.Cog):
     async def count_status(self, ctx):
         """Show the current counting status (admin only)"""
         # Kontrola, zda je příkaz použit v kanálu pro počítání
-        if ctx.channel.id != COUNTING_CHANNEL_ID:
+        if ctx.channel.id != get_current_counting_channel_id():
             try:
                 await ctx.message.delete()
-                await ctx.author.send(f"Příkaz !count lze použít pouze v kanálu pro počítání <#{COUNTING_CHANNEL_ID}>")
+                await ctx.author.send(f"Příkaz !count lze použít pouze v kanálu pro počítání <#{get_current_counting_channel_id()}>")
             except Exception as e:
                 print(f"Chyba při mazání zprávy nebo posílání DM: {str(e)}")
             return
@@ -610,7 +614,7 @@ class Counting(commands.Cog):
 
         embed = discord.Embed(
             title="Počítání",
-            description=f"Aktuální stav počítání v <#{COUNTING_CHANNEL_ID}>",
+            description=f"Aktuální stav počítání v <#{get_current_counting_channel_id()}>",
             color=discord.Color.blue()
         )
 
@@ -626,10 +630,10 @@ class Counting(commands.Cog):
     async def reset_count(self, ctx):
         """Reset the counting (admin only)"""
         # Kontrola, zda je příkaz použit v kanálu pro počítání
-        if ctx.channel.id != COUNTING_CHANNEL_ID:
+        if ctx.channel.id != get_current_counting_channel_id():
             try:
                 await ctx.message.delete()
-                await ctx.author.send(f"Příkaz !countreset lze použít pouze v kanálu pro počítání <#{COUNTING_CHANNEL_ID}>")
+                await ctx.author.send(f"Příkaz !countreset lze použít pouze v kanálu pro počítání <#{get_current_counting_channel_id()}>")
             except Exception as e:
                 print(f"Chyba při mazání zprávy nebo posílání DM: {str(e)}")
             return
@@ -656,10 +660,10 @@ class Counting(commands.Cog):
             days: Počet dní blokace (výchozí: 1)
         """
         # Kontrola, zda je příkaz použit v kanálu pro počítání
-        if ctx.channel.id != COUNTING_CHANNEL_ID:
+        if ctx.channel.id != get_current_counting_channel_id():
             try:
                 await ctx.message.delete()
-                await ctx.author.send(f"Příkaz !countblock lze použít pouze v kanálu pro počítání <#{COUNTING_CHANNEL_ID}>")
+                await ctx.author.send(f"Příkaz !countblock lze použít pouze v kanálu pro počítání <#{get_current_counting_channel_id()}>")
             except Exception as e:
                 print(f"Chyba při mazání zprávy nebo posílání DM: {str(e)}")
             return
@@ -722,10 +726,10 @@ class Counting(commands.Cog):
     async def list_blocked_users(self, ctx):
         """Zobrazí seznam blokovaných uživatelů (admin only)"""
         # Kontrola, zda je příkaz použit v kanálu pro počítání
-        if ctx.channel.id != COUNTING_CHANNEL_ID:
+        if ctx.channel.id != get_current_counting_channel_id():
             try:
                 await ctx.message.delete()
-                await ctx.author.send(f"Příkaz !countblocked lze použít pouze v kanálu pro počítání <#{COUNTING_CHANNEL_ID}>")
+                await ctx.author.send(f"Příkaz !countblocked lze použít pouze v kanálu pro počítání <#{get_current_counting_channel_id()}>")
             except Exception as e:
                 print(f"Chyba při mazání zprávy nebo posílání DM: {str(e)}")
             return
@@ -776,7 +780,7 @@ class Counting(commands.Cog):
         # Vytvoření embedu se seznamem blokovaných uživatelů
         embed = discord.Embed(
             title="⛔ Blokovaní uživatelé",
-            description=f"Seznam uživatelů blokovaných v kanálu pro počítání <#{COUNTING_CHANNEL_ID}>",
+            description=f"Seznam uživatelů blokovaných v kanálu pro počítání <#{get_current_counting_channel_id()}>",
             color=discord.Color.red()
         )
 
@@ -801,10 +805,10 @@ class Counting(commands.Cog):
     async def unblock_user_command(self, ctx, user: discord.Member):
         """Odblokuje uživatele od psaní do kanálu počítání (admin only)"""
         # Kontrola, zda je příkaz použit v kanálu pro počítání
-        if ctx.channel.id != COUNTING_CHANNEL_ID:
+        if ctx.channel.id != get_current_counting_channel_id():
             try:
                 await ctx.message.delete()
-                await ctx.author.send(f"Příkaz !countunblock lze použít pouze v kanálu pro počítání <#{COUNTING_CHANNEL_ID}>")
+                await ctx.author.send(f"Příkaz !countunblock lze použít pouze v kanálu pro počítání <#{get_current_counting_channel_id()}>")
             except Exception as e:
                 print(f"Chyba při mazání zprávy nebo posílání DM: {str(e)}")
             return
@@ -823,7 +827,7 @@ class Counting(commands.Cog):
             return
 
         # Odblokování uživatele
-        channel = self.bot.get_channel(COUNTING_CHANNEL_ID)
+        channel = self.bot.get_channel(get_current_counting_channel_id())
         success = await self.unblock_user(user_id, user, channel)
 
         if success:
@@ -841,6 +845,14 @@ class Counting(commands.Cog):
                 pass
         else:
             await ctx.send(f"Nepodařilo se odblokovat uživatele **{user.display_name}**.", delete_after=5)
+
+    @commands.command(name="setcountingchannel")
+    @commands.has_permissions(administrator=True)
+    async def set_counting_channel(self, ctx, channel: discord.TextChannel):
+        """Nastaví kanál pro počítání (admin only)"""
+        config.set("COUNTING_CHANNEL_ID", channel.id)
+        config.save()
+        await ctx.send(f"Počítací kanál byl nastaven na {channel.mention}.")
 
     @commands.command(name="countrules")
     async def count_rules(self, ctx):
