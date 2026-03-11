@@ -9,7 +9,9 @@ from utils import config
 COUNTING_CHANNEL_ID = config.get_int('COUNTING_CHANNEL_ID')
 
 def get_current_counting_channel_id():
-    return config.get_int('COUNTING_CHANNEL_ID', COUNTING_CHANNEL_ID)
+    # Ensure we always use the latest value from config.json (without requiring full bot restart)
+    config.load_config()
+    return config.get_int('COUNTING_CHANNEL_ID', 0)
 COUNTING_SAVE_FILE = config.get('COUNTING_SAVE_FILE', 'db/counting.json')
 COUNTING_TOPIC_PREFIX = config.get('COUNTING_TOPIC_PREFIX', 'Počítejte od 1 do nekonečna. Další číslo: ')
 
@@ -853,6 +855,15 @@ class Counting(commands.Cog):
         config.set("COUNTING_CHANNEL_ID", channel.id)
         config.save()
         await ctx.send(f"Počítací kanál byl nastaven na {channel.mention}.")
+
+    @commands.command(name="countchannel")
+    @commands.has_permissions(administrator=True)
+    async def count_channel(self, ctx):
+        """Zobrazí aktuálně nastavený counting kanál"""
+        counting_channel_id = get_current_counting_channel_id()
+        channel = self.bot.get_channel(counting_channel_id)
+        mention = channel.mention if channel else f"<#{counting_channel_id}>"
+        await ctx.send(f"Aktuálně nastavený counting channel je {mention} (ID: `{counting_channel_id}`).")
 
     @commands.command(name="countrules")
     async def count_rules(self, ctx):
