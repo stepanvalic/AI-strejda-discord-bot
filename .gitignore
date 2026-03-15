@@ -10,6 +10,14 @@ env/
 
 # Sensitive information
 .env
+.env.local
+.env.*.local
+
+# Node.js dependencies and builds
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
 
 # Database files (except db/sumar/.gitkeep)
 db/*.json
@@ -30,3 +38,5 @@ log/*.log
 *.bak
 *.swp
 *~
+
+docs/

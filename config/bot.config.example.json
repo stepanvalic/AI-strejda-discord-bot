@@ -1,0 +1,43 @@
+{
+  "branding": {
+    "embedColor": "#f5b942",
+    "footerText": "AI Strejda"
+  },
+  "texts": {
+    "activityTexts": [
+      "hlida slash commandy",
+      "kouka na YouTube",
+      "drzi counting v lati"
+    ],
+    "countingTopicPrefix": "Aktualni cislo",
+    "serverRules": [
+      "Chovej se normalne a ne jak rozbity toaster.",
+      "Spam, scam a vylozene toxicky obsah leti.",
+      "V countingu netahni dvakrat po sobe.",
+      "AI role jsou reputacni system, ne automat na vyhry."
+    ]
+  },
+  "reactionRoles": [
+    {
+      "roleId": "1367225661227405423",
+      "emoji": "<:YT_logo:1367226792183599244>",
+      "description": "Ping na nova videa"
+    }
+  ],
+  "features": {
+    "welcome": true,
+    "reactionRoles": true,
+    "utility": true,
+    "moderation": true,
+    "audit": true,
+    "wordFilter": true,
+    "bookmarks": true,
+    "youtube": true,
+    "counting": true,
+    "aiScoring": true,
+    "summary": true
+  },
+  "youtube": {
+    "channelUrl": "https://www.youtube.com/@davidstrejc"
+  }
+}
