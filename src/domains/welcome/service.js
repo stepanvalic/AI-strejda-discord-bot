@@ -1,5 +1,5 @@
-import { Colors } from 'discord.js';
-import { createEmbed, fetchTextChannel } from '../../shared/discord-helpers.js';
+import { Colors, EmbedBuilder } from 'discord.js';
+import { fetchTextChannel } from '../../shared/discord-helpers.js';
 
 export class WelcomeService {
   constructor(context) {
@@ -21,6 +21,18 @@ export class WelcomeService {
     return true;
   }
 
+  buildWelcomeEmbed(member) {
+    return new EmbedBuilder()
+      .setTitle(`Vítej, ${member.displayName}!`)
+      .setDescription(`Zdravím na serveru AI Strejdy, ${member}!`)
+      .setColor(Colors.Green)
+      .setThumbnail(member.displayAvatarURL())
+      .setFooter({
+        text: `ID: ${member.id}  Připojil(a) se`
+      })
+      .setTimestamp(member.joinedAt ?? new Date());
+  }
+
   async sendWelcome(member) {
     const config = await this.context.configStore.get();
     const channel = await fetchTextChannel(member.guild, config.guild.welcomeChannelId);
@@ -30,19 +42,7 @@ export class WelcomeService {
     }
 
     return channel.send({
-      embeds: [
-        createEmbed({
-          title: 'Nový člověk v baráku',
-          color: Colors.Green,
-          description: `Vítej ${member}.\nDiscord ID: \`${member.id}\``,
-          fields: [
-            {
-              name: 'Účet',
-              value: member.user.tag
-            }
-          ]
-        }).setThumbnail(member.displayAvatarURL())
-      ]
+      embeds: [this.buildWelcomeEmbed(member)]
     });
   }
 
@@ -54,11 +54,13 @@ export class WelcomeService {
 
   async backfillDefaultRole(guild) {
     await guild.members.fetch();
+    const config = await this.context.configStore.get();
     const report = {
       scanned: 0,
       added: 0,
       skippedBots: 0,
-      failed: 0
+      failed: 0,
+      defaultRoleId: config.guild.defaultRoleId || null
     };
 
     for (const member of guild.members.cache.values()) {

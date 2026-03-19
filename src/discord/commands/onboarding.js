@@ -1,5 +1,5 @@
-import { MessageFlags, SlashCommandBuilder } from 'discord.js';
-import { adminOnly, guildOnly } from './helpers.js';
+import { Colors, EmbedBuilder, MessageFlags, SlashCommandBuilder } from 'discord.js';
+import { adminOnly } from './helpers.js';
 
 const rewelcomeCommand = {
   meta: { category: 'onboarding', adminOnly: true, hidden: false },
@@ -18,8 +18,11 @@ const rewelcomeCommand = {
     const user = interaction.options.getUser('clen') ?? interaction.user;
     const member = await interaction.guild.members.fetch(user.id);
     const result = await context.services.welcome.rewelcome(member);
+
     await interaction.reply({
-      content: `Welcome flow proběhl. Default role ${result.roleAdded ? 'doplněna' : 'beze změny'}.`,
+      content: result.roleAdded
+        ? `Poslal jsem welcome zprávu pro ${member.displayName} a přidělil default roli.`
+        : `Poslal jsem welcome zprávu pro ${member.displayName}.`,
       flags: MessageFlags.Ephemeral
     });
   }
@@ -34,10 +37,40 @@ const fillDefaultRolesCommand = {
   ),
   async execute(context, interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const config = await context.configStore.get();
+    if (!config.guild.defaultRoleId) {
+      throw new Error('Defaultní role není nastavená v konfiguraci.');
+    }
+
+    const defaultRole = interaction.guild.roles.cache.get(config.guild.defaultRoleId)
+      ?? await interaction.guild.roles.fetch(config.guild.defaultRoleId).catch(() => null);
+
+    if (!defaultRole) {
+      throw new Error(`Defaultní role s ID ${config.guild.defaultRoleId} nebyla nalezena.`);
+    }
+
     const report = await context.services.welcome.backfillDefaultRole(interaction.guild);
-    await interaction.editReply(
-      `Proskenováno: ${report.scanned}, přidáno: ${report.added}, botů přeskočeno: ${report.skippedBots}, failů: ${report.failed}.`
-    );
+
+    const embed = new EmbedBuilder()
+      .setTitle('Kontrola rolí dokončena')
+      .setDescription(`Role ${defaultRole} byla zkontrolována u všech uživatelů.`)
+      .setColor(Colors.Green)
+      .addFields({
+        name: 'Statistiky',
+        value: [
+          `Celkem uživatelů: **${report.scanned}**`,
+          `Přiděleno rolí: **${report.added}**`,
+          `Přeskočeno botů: **${report.skippedBots}**`,
+          `Chyby: **${report.failed}**`
+        ].join('\n')
+      })
+      .setTimestamp(new Date());
+
+    await interaction.editReply({
+      content: null,
+      embeds: [embed]
+    });
   }
 };
 
