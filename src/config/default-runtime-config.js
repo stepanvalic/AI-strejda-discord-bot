@@ -5,7 +5,11 @@ export const defaultRuntimeConfig = Object.freeze({
     defaultRoleId: ''
   },
   discord: {
-    activityTexts: ['/help'],
+    activityTexts: [
+      '{count} kočičkářů',
+      '{count} darebáků',
+      '{count} obránců cat army'
+    ],
     rules: [],
     inviteMaxAgeSeconds: 0,
     inviteMaxUses: 0

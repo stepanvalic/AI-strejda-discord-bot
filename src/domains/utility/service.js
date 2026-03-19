@@ -1,4 +1,4 @@
-import { ChannelType, Colors } from 'discord.js';
+import { ActivityType, ChannelType, Colors } from 'discord.js';
 import { createEmbed, fetchTextChannel } from '../../shared/discord-helpers.js';
 import { chunkArray, formatDuration, mentionChannel, mentionRole } from '../../shared/utils.js';
 
@@ -161,8 +161,23 @@ export class UtilityService {
       return;
     }
 
-    const choice = texts[Math.floor(Math.random() * texts.length)];
-    this.context.client.user.setActivity(choice);
+    const guild = this.context.client.guilds.cache.get(this.context.guildId);
+    const memberCount = guild?.memberCount ?? 0;
+    const index = this.context.runtime.currentActivityIndex % texts.length;
+    const template = texts[index];
+    const status = template.replaceAll('{count}', String(memberCount));
+
+    this.context.runtime.currentActivityIndex = (index + 1) % texts.length;
+
+    await this.context.client.user.setPresence({
+      activities: [
+        {
+          type: ActivityType.Watching,
+          name: status
+        }
+      ],
+      status: 'online'
+    });
   }
 }
 

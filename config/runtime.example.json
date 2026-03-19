@@ -6,13 +6,13 @@
   },
   "discord": {
     "activityTexts": [
-      "/help a /prikazy",
-      "hlídám counting",
-      "koukám na YouTube"
+      "{count} kočičkářů",
+      "{count} darebáků",
+      "{count} obránců cat army"
     ],
     "rules": [
-      "Bud normalni clovek a nech se s ostatnimi zit.",
-      "Nepostuj bordel, ktery bys nechtel videt i ty.",
+      "Buď normální člověk a nech se s ostatními žít.",
+      "Nepostuj bordel, který bys nechtěl vidět i ty.",
       "Counting kanál není ruleta, tam se počítá po jedné."
     ],
     "inviteMaxAgeSeconds": 0,

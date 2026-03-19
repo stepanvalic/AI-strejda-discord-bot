@@ -29,7 +29,8 @@ export async function createContext() {
       aiBuffers: new Map(),
       summaryCooldowns: new Map(),
       lastDailySummaryDate: null,
-      countingLastValidMessage: null
+      countingLastValidMessage: null,
+      currentActivityIndex: 0
     }
   };
 }

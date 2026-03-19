@@ -3,6 +3,16 @@ export function startSchedulers(context) {
 
   timers.push(setInterval(async () => {
     try {
+      await context.services.utility.setPresence().catch((error) => {
+        context.logger.warn({ err: error }, 'Rotace aktivit spadla.');
+      });
+    } catch (error) {
+      context.logger.warn({ err: error }, 'Activity scheduler spadl.');
+    }
+  }, 300_000));
+
+  timers.push(setInterval(async () => {
+    try {
       const config = await context.configStore.get();
       if (config.features.youtube) {
         await context.services.youtube.checkLatestAndAnnounce().catch((error) => {
