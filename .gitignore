@@ -1,32 +1,6 @@
-# Python bytecode
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Virtual environments
-.venv/
-venv/
-env/
-
-# Sensitive information
+docs/
+db/
 .env
-
-# Database files (except db/sumar/.gitkeep)
-db/*.json
-db/sumar/*.json
-db/*
-!db/sumar/
-!db/sumar/.gitkeep
-
-# Log files
-log/*.log
-
-# IDE files
-.vscode/
-.idea/
-
-# Temporary files
-*.tmp
-*.bak
-*.swp
-*~
+node_modules/
+logs/
+config/runtime.local.json
