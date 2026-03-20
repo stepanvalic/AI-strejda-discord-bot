@@ -6,6 +6,47 @@ export class SummaryService {
     this.context = context;
   }
 
+  buildSummaryChunks(summary) {
+    if (!summary) {
+      return ['Shrnutí není k dispozici.'];
+    }
+
+    if (summary.length <= 4096) {
+      return [summary];
+    }
+
+    const paragraphs = summary.split('\n\n');
+    const chunks = [];
+    let currentChunk = '';
+
+    for (const paragraph of paragraphs) {
+      if (currentChunk && currentChunk.length + paragraph.length + 2 > 4096) {
+        chunks.push(currentChunk);
+        currentChunk = '';
+      }
+
+      if (paragraph.length > 4096) {
+        if (currentChunk) {
+          chunks.push(currentChunk);
+          currentChunk = '';
+        }
+
+        for (const chunk of chunkText(paragraph, 4096)) {
+          chunks.push(chunk);
+        }
+        continue;
+      }
+
+      currentChunk = currentChunk ? `${currentChunk}\n\n${paragraph}` : paragraph;
+    }
+
+    if (currentChunk) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks;
+  }
+
   async captureMessage(message) {
     const config = await this.context.configStore.get();
 
@@ -76,7 +117,7 @@ export class SummaryService {
     return nextValue;
   }
 
-  async summarizeMessages(messages) {
+  async summarizeMessages(messages, _provider) {
     if (!messages.length) {
       return {
         summary: 'Ten den se v summary kanálu nic neodehrálo.',
@@ -88,12 +129,38 @@ export class SummaryService {
       return this.fallbackSummary(messages);
     }
 
-    const prompt = [
-      'Udělej věcné denní shrnutí Discord chatu v češtině.',
-      'Použij markery [TOPIC_START:index] pro začátek témat.',
-      'Buď stručný, ale výstižný.',
+    const messageTexts = [];
+
+    for (const message of messages) {
+      const content = message.content?.trim();
+      if (!content) {
+        continue;
+      }
+
+      const timestamp = message.timestamp.slice(0, 19);
+      messageTexts.push(`[${timestamp}] ${message.display_name}: ${content}`);
+    }
+
+    const systemPrompt = [
+      'Jsi kreativní a zábavný asistent, který vytváří denní shrnutí diskuzí z Discord chatu.',
+      'Tvým úkolem je analyzovat zprávy a vytvořit poutavé a čtivé shrnutí hlavních témat, která se v chatu probírala.',
+      'Shrnutí musí být v češtině, rozdělené podle témat, ale psané neformálním a zábavným způsobem.',
+      'Pro každé téma identifikuj první zprávu, která toto téma začíná, a označ ji jako `[TOPIC_START:index]`, kde index je pořadové číslo zprávy v seznamu od 0.',
+      'Zahrň odkazy, pokud se v chatu nějaké vyskytly.',
+      'Místo suchého reportu se zaměř na to, aby shrnutí bylo poutavé, jako bys vyprávěl příběh.',
+      'Datum v hlavičce formátuj jako `D. M. YYYY`.',
+      'Na konci přidej krátký a vtipný souhrn celého dne.'
+    ].join(' ');
+
+    const userPrompt = [
+      `Zde jsou zprávy z Discord chatu ze dne ${messages[0].timestamp.slice(0, 10)}.`,
+      'Vytvoř zábavné a poutavé shrnutí hlavních témat, která se probírala.',
+      'Rozděl shrnutí podle témat, ale piš ho jako příběh, ne jako suchý report.',
+      'Pro každé téma označ první zprávu markerem `[TOPIC_START:index]`.',
+      'Pokud se v chatu stalo něco obzvlášť vtipného nebo výrazného, nezapomeň to zmínit.',
+      `Formát hlavičky musí být přesně: "📊 Shrnutí chatu za ${messages[0].timestamp.slice(0, 10)}\\nShrnutí diskuzí z Discord chatu (D. M. YYYY)\\n---"`,
       '',
-      ...messages.map((message, index) => `[${index}] ${message.display_name}: ${message.content || '(priloha)'}`)
+      messageTexts.join('\n')
     ].join('\n');
 
     const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -105,8 +172,8 @@ export class SummaryService {
       body: JSON.stringify({
         model: 'deepseek-chat',
         messages: [
-          { role: 'system', content: 'Jsi analytik Discord komunity.' },
-          { role: 'user', content: prompt }
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
         ]
       })
     });
@@ -178,7 +245,7 @@ export class SummaryService {
   replaceTopicMarkers(text, messages) {
     return text.replace(/\[TOPIC_START:(\d+)\]/gu, (_, indexText) => {
       const message = messages[Number(indexText)];
-      return message?.jump_url ?? '';
+      return message?.jump_url ? `[téma](${message.jump_url})` : '';
     });
   }
 
@@ -203,12 +270,14 @@ export class SummaryService {
       return false;
     }
 
-    for (const chunk of chunkText(summaryRecord.summary, 1900)) {
+    const chunks = this.buildSummaryChunks(summaryRecord.summary);
+
+    for (const [index, chunk] of chunks.entries()) {
       await channel.send({
         embeds: [
           createEmbed({
-            title: `Denní shrnutí ${summaryRecord.date}`,
-            description: chunk
+            description: chunk,
+            footer: index === 0 ? `Celkem zpráv: ${summaryRecord.message_count}` : undefined
           })
         ]
       });
@@ -229,7 +298,26 @@ export class SummaryService {
     const messages = store.messages.slice(-count);
     const result = await this.summarizeMessages(messages, config.summary.provider);
     this.context.runtime.summaryCooldowns.set(member.id, Date.now() + config.summary.cooldownHours * 3_600_000);
-    return result;
+    return {
+      ...result,
+      messageCount: messages.length
+    };
+  }
+
+  async sendSummaryToUserDm(user, summaryRecord) {
+    const dm = await user.createDM();
+    const chunks = this.buildSummaryChunks(summaryRecord.summary);
+
+    for (const [index, chunk] of chunks.entries()) {
+      await dm.send({
+        embeds: [
+          createEmbed({
+            description: chunk,
+            footer: index === 0 ? `Celkem zpráv: ${summaryRecord.messageCount ?? summaryRecord.message_count ?? 0}` : undefined
+          })
+        ]
+      });
+    }
   }
 
   async getTodayMessageCount() {

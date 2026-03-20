@@ -8,8 +8,8 @@ import { getSummaryCommands } from './summary.js';
 import { getUtilityCommands } from './utility.js';
 import { getYoutubeAdminCommands } from './youtube-admin.js';
 
-export function getCommands() {
-  return [
+export function getCommands(config) {
+  const commands = [
     ...getUtilityCommands(),
     ...getOnboardingCommands(),
     ...getModerationCommands(),
@@ -20,4 +20,10 @@ export function getCommands() {
     ...getSetupCommands(),
     ...getYoutubeAdminCommands()
   ];
+
+  if (config?.features?.setup === false) {
+    return commands.filter((command) => command.meta.category !== 'setup');
+  }
+
+  return commands;
 }

@@ -23,9 +23,162 @@ function normalizeVideoRecord(detail) {
   };
 }
 
+function decodeXmlEntities(value) {
+  return value
+    .replaceAll('&amp;', '&')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&#39;', "'");
+}
+
+function normalizeFeedVideoRecord(feedVideo) {
+  return {
+    video_id: feedVideo.videoId,
+    title: feedVideo.title,
+    description: '',
+    thumbnail_url: feedVideo.thumbnailUrl,
+    published_at: feedVideo.publishedAt,
+    channel_title: feedVideo.author,
+    duration: '',
+    views: 0,
+    likes: 0,
+    comments: 0,
+    message_id: null,
+    channel_message_id: null,
+    announced_at: null,
+    last_updated: new Date().toISOString(),
+    is_live: false,
+    scheduled_start_time: null,
+    actual_start_time: null
+  };
+}
+
 export class YoutubeService {
   constructor(context) {
     this.context = context;
+  }
+
+  normalizeChannelInput(handleOrId) {
+    const value = handleOrId.trim();
+
+    if (value.startsWith('UC')) {
+      return { type: 'channelId', value };
+    }
+
+    try {
+      const url = new URL(value);
+
+      if (!/youtube\.com$/u.test(url.hostname) && !/www\.youtube\.com$/u.test(url.hostname)) {
+        return { type: 'query', value };
+      }
+
+      if (url.pathname.startsWith('/channel/')) {
+        const channelId = url.pathname.split('/')[2];
+        if (channelId?.startsWith('UC')) {
+          return { type: 'channelId', value: channelId };
+        }
+      }
+
+      if (url.pathname.startsWith('/@')) {
+        return { type: 'handleUrl', value: `${url.origin}${url.pathname}` };
+      }
+
+      return { type: 'query', value };
+    } catch {
+      if (value.startsWith('@')) {
+        return { type: 'handleUrl', value: `https://www.youtube.com/${value}` };
+      }
+
+      return { type: 'query', value };
+    }
+  }
+
+  async resolveChannelIdFromPage(channelUrl) {
+    const response = await fetch(channelUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Nepodařilo se načíst YouTube stránku (${response.status}).`);
+    }
+
+    const html = await response.text();
+    const patterns = [
+      /<link rel="canonical" href="https:\/\/www\.youtube\.com\/channel\/(UC[\w-]{20,})"/u,
+      /"externalId":"(UC[\w-]{20,})"/u,
+      /"browseId":"(UC[\w-]{20,})"/u,
+      /https:\/\/www\.youtube\.com\/channel\/(UC[\w-]{20,})/u
+    ];
+
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match?.[1]) {
+        return match[1];
+      }
+    }
+
+    if (!html.includes('youtube.com')) {
+      throw new Error('Nepodařilo se vyčíst ID YouTube kanálu ze stránky.');
+    }
+    
+    throw new Error('Nepodařilo se vyčíst ID YouTube kanálu ze stránky.');
+  }
+
+  async fetchLatestVideoFromFeed(channelId) {
+    const response = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Nepodařilo se načíst YouTube feed (${response.status}).`);
+    }
+
+    const xml = await response.text();
+    const entryMatch = xml.match(/<entry>([\s\S]*?)<\/entry>/u);
+
+    if (!entryMatch?.[1]) {
+      throw new Error('V YouTube feedu není žádné video.');
+    }
+
+    const entry = entryMatch[1];
+    const videoId = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/u)?.[1];
+    const title = decodeXmlEntities(entry.match(/<title>([^<]+)<\/title>/u)?.[1] ?? '');
+    const author = decodeXmlEntities(entry.match(/<name>([^<]+)<\/name>/u)?.[1] ?? '');
+    const publishedAt = entry.match(/<published>([^<]+)<\/published>/u)?.[1] ?? new Date().toISOString();
+    const thumbnailUrl = entry.match(/<media:thumbnail url="([^"]+)"/u)?.[1] ?? '';
+
+    if (!videoId || !title) {
+      throw new Error('V YouTube feedu chybí data o posledním videu.');
+    }
+
+    return {
+      videoId,
+      title,
+      author,
+      publishedAt,
+      thumbnailUrl
+    };
+  }
+
+  async fetchVideoDetail(videoId) {
+    if (!this.context.env.YOUTUBE_API_KEY) {
+      return null;
+    }
+
+    const detailResponse = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails,liveStreamingDetails&id=${videoId}&key=${this.context.env.YOUTUBE_API_KEY}`);
+
+    if (!detailResponse.ok) {
+      const payload = await detailResponse.json().catch(() => ({}));
+      throw new Error(payload.error?.message || `YouTube detail API vrátila ${detailResponse.status}.`);
+    }
+
+    const detailPayload = await detailResponse.json();
+    return detailPayload.items?.[0] ?? null;
   }
 
   async resolveChannelId(handleOrId) {
@@ -33,11 +186,17 @@ export class YoutubeService {
       throw new Error('YouTube kanál není nastavený.');
     }
 
-    if (handleOrId.startsWith('UC')) {
-      return handleOrId;
+    const normalized = this.normalizeChannelInput(handleOrId);
+
+    if (normalized.type === 'channelId') {
+      return normalized.value;
     }
 
-    const query = handleOrId.replace(/^@/u, '');
+    if (normalized.type === 'handleUrl') {
+      return this.resolveChannelIdFromPage(normalized.value);
+    }
+
+    const query = normalized.value.replace(/^@/u, '');
     const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=1&q=${encodeURIComponent(query)}&key=${this.context.env.YOUTUBE_API_KEY}`);
     const payload = await response.json();
     const item = payload.items?.[0];
@@ -51,29 +210,19 @@ export class YoutubeService {
 
   async fetchLatestVideo() {
     const config = await this.context.configStore.get();
-
-    if (!this.context.env.YOUTUBE_API_KEY) {
-      throw new Error('Chybí YOUTUBE_API_KEY.');
-    }
-
     const channelId = await this.resolveChannelId(config.youtube.channelHandleOrId);
-    const searchResponse = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=5&order=date&type=video&key=${this.context.env.YOUTUBE_API_KEY}`);
-    const searchPayload = await searchResponse.json();
-    const firstItem = searchPayload.items?.[0];
+    const feedVideo = await this.fetchLatestVideoFromFeed(channelId);
 
-    if (!firstItem?.id?.videoId) {
-      throw new Error('Nepodařilo se najít žádné video.');
+    try {
+      const detail = await this.fetchVideoDetail(feedVideo.videoId);
+      if (detail) {
+        return normalizeVideoRecord(detail);
+      }
+    } catch (error) {
+      this.context.logger.warn({ err: error }, 'YouTube detail API selhala, padám na RSS feed.');
     }
 
-    const detailResponse = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails,liveStreamingDetails&id=${firstItem.id.videoId}&key=${this.context.env.YOUTUBE_API_KEY}`);
-    const detailPayload = await detailResponse.json();
-    const detail = detailPayload.items?.[0];
-
-    if (!detail) {
-      throw new Error('Nepodařilo se načíst detail videa.');
-    }
-
-    return normalizeVideoRecord(detail);
+    return normalizeFeedVideoRecord(feedVideo);
   }
 
   buildNotification(video, pingRoleId) {

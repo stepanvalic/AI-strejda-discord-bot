@@ -77,6 +77,7 @@ export const runtimeConfigSchema = z.object({
     channelId: z.string().default('')
   }),
   features: z.object({
+    setup: z.boolean().default(true),
     reactionRoles: z.boolean().default(true),
     wordFilter: z.boolean().default(true),
     bookmarks: z.boolean().default(true),

@@ -165,6 +165,10 @@ Admin:
 - `/log-level` - změní log level
 - `/filter-pridej-slovo` - přidá slovo do blacklistu
 
+Poznámka:
+
+- setup commandy lze vypnout přes `features.setup`
+
 ### YouTube admin
 
 Admin:

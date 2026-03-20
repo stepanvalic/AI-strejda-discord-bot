@@ -3,7 +3,8 @@ import { getCommands } from '../src/discord/commands/index.js';
 import { registerSlashCommands } from '../src/discord/register-slash-commands.js';
 
 const context = await createContext();
-const commands = getCommands();
+const config = await context.configStore.get();
+const commands = getCommands(config);
 
 await registerSlashCommands({
   env: context.env,

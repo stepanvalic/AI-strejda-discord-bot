@@ -1,5 +1,5 @@
 import { MessageFlags, SlashCommandBuilder } from 'discord.js';
-import { adminOnly, ensureTextChannelOption, guildOnly, parseSummaryDateInput, sendChunksToDm } from './helpers.js';
+import { adminOnly, ensureTextChannelOption, guildOnly, parseSummaryDateInput } from './helpers.js';
 import { getYesterdayDateString } from '../../shared/utils.js';
 
 const dailySummaryCommand = {
@@ -62,7 +62,7 @@ const recentSummaryCommand = {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const count = interaction.options.getInteger('pocet', true);
     const result = await context.services.summary.summarizeRecentForUser(interaction.member, count);
-    await sendChunksToDm(interaction.user, `Shrnutí posledních ${count} zpráv`, result.summary);
+    await context.services.summary.sendSummaryToUserDm(interaction.user, result);
     await interaction.editReply('Shrnutí jsem poslal do DM.');
   }
 };

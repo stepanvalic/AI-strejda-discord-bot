@@ -7,7 +7,8 @@ import { getClientOptions, registerEventHandlers } from '../discord/register-eve
 export async function bootstrap() {
   const context = await createContext();
   context.services = createServices(context);
-  const commands = getCommands();
+  const config = await context.configStore.get();
+  const commands = getCommands(config);
   context.commands = commands;
   context.commandMap = new Map(commands.map((command) => [command.data.name, command]));
   context.client = new Client(getClientOptions());
