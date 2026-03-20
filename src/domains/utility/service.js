@@ -20,34 +20,6 @@ export class UtilityService {
     };
   }
 
-  async getYoutubeLinkResponse() {
-    const config = await this.context.configStore.get();
-    const handle = config.youtube.channelHandleOrId || '(nenastaveno)';
-    const url = handle.startsWith('@') ? `https://www.youtube.com/${handle}` : `https://www.youtube.com/channel/${handle}`;
-
-    return {
-      embeds: [
-        createEmbed({
-          title: 'YouTube kanál',
-          description: `[Otevřít kanál](${url})`
-        })
-      ]
-    };
-  }
-
-  async getYoutubeNotificationResponse() {
-    const config = await this.context.configStore.get();
-
-    return {
-      embeds: [
-        createEmbed({
-          title: 'YouTube notifikace',
-          description: `Notifikace chodí do ${mentionChannel(config.youtube.notificationChannelId)}.`
-        })
-      ]
-    };
-  }
-
   async createInvite(interaction) {
     const config = await this.context.configStore.get();
     const targetChannel = await fetchTextChannel(interaction.guild, config.guild.welcomeChannelId) ?? interaction.channel;

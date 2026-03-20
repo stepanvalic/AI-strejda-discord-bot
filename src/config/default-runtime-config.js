@@ -59,7 +59,6 @@ export const defaultRuntimeConfig = Object.freeze({
     channelId: ''
   },
   features: {
-    welcome: true,
     reactionRoles: true,
     wordFilter: true,
     bookmarks: true,

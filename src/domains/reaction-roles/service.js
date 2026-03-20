@@ -6,6 +6,16 @@ export class ReactionRoleService {
     this.context = context;
   }
 
+  async setChannelAndSyncMessage(guild, channelId) {
+    await this.context.configStore.update((current) => {
+      current.reactionRoles.channelId = channelId;
+      current.reactionRoles.messageId = '';
+      return current;
+    });
+
+    return this.syncMessage(guild);
+  }
+
   async syncMessage(guild) {
     const config = await this.context.configStore.get();
     const channel = await fetchTextChannel(guild, config.reactionRoles.channelId);

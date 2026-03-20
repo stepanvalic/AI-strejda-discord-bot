@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { access, copyFile, mkdir } from 'node:fs/promises';
 import { JsonFileStore } from './json-file-store.js';
 
 function createCountingDefault() {
@@ -16,6 +17,8 @@ export class JsonDatabase {
   constructor({ dataDir, summaryDir }) {
     this.dataDir = path.resolve(dataDir);
     this.summaryDir = path.resolve(summaryDir);
+    this.bookmarksPath = path.resolve('db', 'bookmarks.json');
+    this.legacyBookmarksPath = path.join(this.dataDir, 'bookmarks.json');
     this.counting = new JsonFileStore(path.join(this.dataDir, 'counting.json'), createCountingDefault);
     this.aiModeration = new JsonFileStore(path.join(this.dataDir, 'ai_moderation.json'), () => ({
       users: {},
@@ -32,13 +35,45 @@ export class JsonDatabase {
     this.filteredWords = new JsonFileStore(path.join(this.dataDir, 'filtered_words.json'), () => ({
       filtered_messages: []
     }));
-    this.bookmarks = new JsonFileStore(path.join(this.dataDir, 'bookmarks.json'), () => ({}));
+    this.bookmarks = new JsonFileStore(this.bookmarksPath, () => ({}));
     this.tokenUsage = new JsonFileStore(path.join(this.dataDir, 'token_usage.json'), () => ({
       entries: []
     }));
   }
 
+  async fileExists(filePath) {
+    try {
+      await access(filePath);
+      return true;
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        return false;
+      }
+
+      throw error;
+    }
+  }
+
+  async migrateBookmarksIfNeeded() {
+    if (this.bookmarksPath === this.legacyBookmarksPath) {
+      return;
+    }
+
+    if (await this.fileExists(this.bookmarksPath)) {
+      return;
+    }
+
+    if (!await this.fileExists(this.legacyBookmarksPath)) {
+      return;
+    }
+
+    await mkdir(path.dirname(this.bookmarksPath), { recursive: true });
+    await copyFile(this.legacyBookmarksPath, this.bookmarksPath);
+  }
+
   async ensure() {
+    await this.migrateBookmarksIfNeeded();
+
     await Promise.all([
       this.counting.read(),
       this.aiModeration.read(),

@@ -46,11 +46,6 @@ export function registerEventHandlers(context) {
         return;
       }
 
-      const config = await context.configStore.get();
-      if (!config.features.welcome) {
-        return;
-      }
-
       await services.welcome.rewelcome(member);
     } catch (error) {
       logger.warn({ err: error }, 'Welcome flow selhal.');

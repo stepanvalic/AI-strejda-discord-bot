@@ -85,7 +85,6 @@
     "channelId": "123456789012345693"
   },
   "features": {
-    "welcome": true,
     "reactionRoles": true,
     "wordFilter": true,
     "bookmarks": true,

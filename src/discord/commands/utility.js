@@ -1,30 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { adminOnly, ensureTextChannelOption, guildOnly } from './helpers.js';
 
-const youtubeCommand = {
-  meta: { category: 'utility', adminOnly: false, hidden: false },
-  data: guildOnly(
-    new SlashCommandBuilder()
-      .setName('youtube')
-      .setDescription('Pošle odkaz na sledovaný YouTube kanál.')
-  ),
-  async execute(context, interaction) {
-    await interaction.reply(await context.services.utility.getYoutubeLinkResponse());
-  }
-};
-
-const youtubeChannelCommand = {
-  meta: { category: 'utility', adminOnly: false, hidden: false },
-  data: guildOnly(
-    new SlashCommandBuilder()
-      .setName('youtube-kanal')
-      .setDescription('Ukáže kanál, kam chodí YouTube notifikace.')
-  ),
-  async execute(context, interaction) {
-    await interaction.reply(await context.services.utility.getYoutubeNotificationResponse());
-  }
-};
-
 const uptimeCommand = {
   meta: { category: 'utility', adminOnly: false, hidden: false },
   data: guildOnly(
@@ -117,8 +93,6 @@ const publishRulesCommand = {
 
 export function getUtilityCommands() {
   return [
-    youtubeCommand,
-    youtubeChannelCommand,
     uptimeCommand,
     inviteCommand,
     commandsCommand,

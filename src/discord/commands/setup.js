@@ -143,6 +143,26 @@ const setupAuditExistingCommand = {
   }
 };
 
+const setupReactionRolesCommand = {
+  meta: { category: 'setup', adminOnly: true, hidden: false },
+  data: ensureTextChannelOption(
+    adminOnly(
+      new SlashCommandBuilder()
+        .setName('setup-reakcni-role')
+        .setDescription('Nastaví kanál pro reakční role a pošle do něj panel.')
+    ),
+    'kanal',
+    'Kanál pro panel reakčních rolí.',
+    true
+  ),
+  async execute(context, interaction) {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const channel = interaction.options.getChannel('kanal', true);
+    const message = await context.services.reactionRoles.setChannelAndSyncMessage(interaction.guild, channel.id);
+    await interaction.editReply(`Reaction role panel je hotový v ${channel}: ${message.url}`);
+  }
+};
+
 const logLevelCommand = {
   meta: { category: 'setup', adminOnly: true, hidden: false },
   data: adminOnly(
@@ -205,6 +225,7 @@ export function getSetupCommands() {
     setupAuditChannelCommand,
     setupPermissionsCommand,
     setupAuditExistingCommand,
+    setupReactionRolesCommand,
     logLevelCommand,
     addFilteredWordCommand
   ];

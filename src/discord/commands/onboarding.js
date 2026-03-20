@@ -1,33 +1,6 @@
 import { Colors, EmbedBuilder, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { adminOnly } from './helpers.js';
 
-const rewelcomeCommand = {
-  meta: { category: 'onboarding', adminOnly: true, hidden: false },
-  data: adminOnly(
-    new SlashCommandBuilder()
-      .setName('uvitat')
-      .setDescription('Znovu pustí welcome flow pro člena.')
-      .addUserOption((option) =>
-        option
-          .setName('clen')
-          .setDescription('Volitelný člen, jinak ty.')
-          .setRequired(false)
-      )
-  ),
-  async execute(context, interaction) {
-    const user = interaction.options.getUser('clen') ?? interaction.user;
-    const member = await interaction.guild.members.fetch(user.id);
-    const result = await context.services.welcome.rewelcome(member);
-
-    await interaction.reply({
-      content: result.roleAdded
-        ? `Poslal jsem welcome zprávu pro ${member.displayName} a přidělil default roli.`
-        : `Poslal jsem welcome zprávu pro ${member.displayName}.`,
-      flags: MessageFlags.Ephemeral
-    });
-  }
-};
-
 const fillDefaultRolesCommand = {
   meta: { category: 'onboarding', adminOnly: true, hidden: false },
   data: adminOnly(
@@ -91,5 +64,5 @@ const reactionRoleSyncCommand = {
 };
 
 export function getOnboardingCommands() {
-  return [rewelcomeCommand, fillDefaultRolesCommand, reactionRoleSyncCommand];
+  return [fillDefaultRolesCommand, reactionRoleSyncCommand];
 }

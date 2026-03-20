@@ -1,7 +1,6 @@
 import { getAiCommands } from './ai.js';
 import { getBookmarkCommands } from './bookmarks.js';
 import { getCountingCommands } from './counting.js';
-import { getHiddenCommands } from './hidden.js';
 import { getModerationCommands } from './moderation.js';
 import { getOnboardingCommands } from './onboarding.js';
 import { getSetupCommands } from './setup.js';
@@ -19,7 +18,6 @@ export function getCommands() {
     ...getSummaryCommands(),
     ...getBookmarkCommands(),
     ...getSetupCommands(),
-    ...getYoutubeAdminCommands(),
-    ...getHiddenCommands()
+    ...getYoutubeAdminCommands()
   ];
 }
