@@ -10,9 +10,9 @@ function normalizeVideoRecord(detail) {
     published_at: detail.snippet.publishedAt,
     channel_title: detail.snippet.channelTitle,
     duration: detail.contentDetails?.duration || '',
-    views: Number(detail.statistics?.viewCount || 0),
-    likes: Number(detail.statistics?.likeCount || 0),
-    comments: Number(detail.statistics?.commentCount || 0),
+    views: detail.statistics?.viewCount ? Number(detail.statistics.viewCount) : null,
+    likes: detail.statistics?.likeCount ? Number(detail.statistics.likeCount) : null,
+    comments: detail.statistics?.commentCount ? Number(detail.statistics.commentCount) : null,
     message_id: null,
     channel_message_id: null,
     announced_at: null,
@@ -41,9 +41,9 @@ function normalizeFeedVideoRecord(feedVideo) {
     published_at: feedVideo.publishedAt,
     channel_title: feedVideo.author,
     duration: '',
-    views: 0,
-    likes: 0,
-    comments: 0,
+    views: null,
+    likes: null,
+    comments: null,
     message_id: null,
     channel_message_id: null,
     announced_at: null,
@@ -52,6 +52,14 @@ function normalizeFeedVideoRecord(feedVideo) {
     scheduled_start_time: null,
     actual_start_time: null
   };
+}
+
+function formatMetric(value) {
+  if (value === null || value === undefined) {
+    return 'nezjištěno';
+  }
+
+  return new Intl.NumberFormat('cs-CZ').format(value);
 }
 
 export class YoutubeService {
@@ -240,9 +248,9 @@ export class YoutubeService {
           color: video.is_live ? Colors.Red : Colors.Blurple,
           description: `[${video.title}](https://www.youtube.com/watch?v=${video.video_id})`,
           fields: [
-            { name: 'Kanal', value: video.channel_title, inline: true },
-            { name: 'Views', value: String(video.views), inline: true },
-            { name: 'Likes', value: String(video.likes), inline: true }
+            { name: 'Kanál', value: video.channel_title, inline: true },
+            { name: 'Zhlédnutí', value: formatMetric(video.views), inline: true },
+            { name: 'Lajky', value: formatMetric(video.likes), inline: true }
           ]
         }).setImage(video.thumbnail_url)
       ]
