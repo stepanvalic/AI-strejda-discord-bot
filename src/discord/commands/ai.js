@@ -17,7 +17,8 @@ const aiScoreCommand = {
   ),
   async execute(context, interaction) {
     const user = interaction.options.getUser('clen') ?? interaction.user;
-    await interaction.reply({
+    await interaction.deferReply();
+    await interaction.editReply({
       embeds: [await context.services.ai.getUserScoreEmbed(user)]
     });
   }
@@ -31,7 +32,8 @@ const aiTopCommand = {
       .setDescription('Top 10 podle AI score.')
   ),
   async execute(context, interaction) {
-    await interaction.reply({
+    await interaction.deferReply();
+    await interaction.editReply({
       embeds: [await context.services.ai.getLeaderboardEmbed(interaction.guild, true)]
     });
   }
@@ -45,7 +47,8 @@ const aiBottomCommand = {
       .setDescription('Bottom 10 podle AI score.')
   ),
   async execute(context, interaction) {
-    await interaction.reply({
+    await interaction.deferReply();
+    await interaction.editReply({
       embeds: [await context.services.ai.getLeaderboardEmbed(interaction.guild, false)]
     });
   }

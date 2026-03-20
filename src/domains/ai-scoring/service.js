@@ -272,11 +272,9 @@ export class AiScoringService {
       });
     }
 
-    const fields = [];
-
-    for (const [index, entry] of users.entries()) {
+    const fields = await Promise.all(users.map(async (entry, index) => {
       const displayName = await this.resolveDisplayName(guild, entry);
-      fields.push({
+      return {
         name: `${index + 1}. ${displayName}`,
         value: [
           `Skóre: **${entry.total_score}**`,
@@ -285,8 +283,8 @@ export class AiScoringService {
           `Zprávy: **${entry.messages_analyzed}**`
         ].join('\n'),
         inline: true
-      });
-    }
+      };
+    }));
 
     return createEmbed({
       title: descending ? '🏆 AI skóre - Top 10 uživatelů' : '⚠️ AI skóre - Bottom 10 uživatelů',
