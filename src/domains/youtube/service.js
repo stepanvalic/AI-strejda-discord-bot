@@ -265,6 +265,39 @@ export class YoutubeService {
     }
   }
 
+  async enrichVideoMetadata(video) {
+    try {
+      const detail = await this.fetchVideoDetail(video.video_id);
+      if (detail) {
+        return {
+          ...video,
+          ...normalizeVideoRecord(detail),
+          message_id: video.message_id ?? null,
+          channel_message_id: video.channel_message_id ?? null,
+          announced_at: video.announced_at ?? null
+        };
+      }
+    } catch (error) {
+      this.context.logger.warn({ err: error }, 'YouTube detail API selhala při obohacení videa.');
+    }
+
+    try {
+      const metrics = await this.fetchVideoMetricsFromPage(video.video_id);
+      return {
+        ...video,
+        views: metrics.views ?? video.views ?? null,
+        likes: metrics.likes ?? video.likes ?? null,
+        last_updated: new Date().toISOString()
+      };
+    } catch (error) {
+      this.context.logger.warn({ err: error }, 'YouTube stránka videa selhala při obohacení videa.');
+      return {
+        ...video,
+        last_updated: new Date().toISOString()
+      };
+    }
+  }
+
   buildNotification(video, pingRoleId) {
     const liveLabel = video.is_live
       ? 'Právě běží stream'
@@ -344,10 +377,7 @@ export class YoutubeService {
     let updated = 0;
 
     for (const video of latest) {
-      await this.saveVideo({
-        ...video,
-        last_updated: new Date().toISOString()
-      });
+      await this.saveVideo(await this.enrichVideoMetadata(video));
       updated += 1;
     }
 
@@ -362,6 +392,8 @@ export class YoutubeService {
       throw new Error('Ve store ještě není žádné video.');
     }
 
-    return this.announceVideo(latest, true);
+    const enriched = await this.enrichVideoMetadata(latest);
+    await this.saveVideo(enriched);
+    return this.announceVideo(enriched, true);
   }
 }
