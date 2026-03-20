@@ -189,6 +189,27 @@ export class YoutubeService {
     return detailPayload.items?.[0] ?? null;
   }
 
+  async fetchVideoMetricsFromPage(videoId) {
+    const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Nepodařilo se načíst stránku videa (${response.status}).`);
+    }
+
+    const html = await response.text();
+    const views = html.match(/"viewCount":"(\d+)"/u)?.[1];
+    const likes = html.match(/"likeCountIfLikedNumber":"(\d+)"/u)?.[1];
+
+    return {
+      views: views ? Number(views) : null,
+      likes: likes ? Number(likes) : null
+    };
+  }
+
   async resolveChannelId(handleOrId) {
     if (!handleOrId) {
       throw new Error('YouTube kanál není nastavený.');
@@ -229,8 +250,19 @@ export class YoutubeService {
     } catch (error) {
       this.context.logger.warn({ err: error }, 'YouTube detail API selhala, padám na RSS feed.');
     }
+    const feedRecord = normalizeFeedVideoRecord(feedVideo);
 
-    return normalizeFeedVideoRecord(feedVideo);
+    try {
+      const metrics = await this.fetchVideoMetricsFromPage(feedVideo.videoId);
+      return {
+        ...feedRecord,
+        views: metrics.views,
+        likes: metrics.likes
+      };
+    } catch (error) {
+      this.context.logger.warn({ err: error }, 'YouTube stránka videa selhala, metriky zůstanou neznámé.');
+      return feedRecord;
+    }
   }
 
   buildNotification(video, pingRoleId) {
