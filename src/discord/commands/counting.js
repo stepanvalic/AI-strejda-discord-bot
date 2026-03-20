@@ -1,4 +1,5 @@
 import { MessageFlags, SlashCommandBuilder } from 'discord.js';
+import { createEmbed } from '../../shared/discord-helpers.js';
 import { adminOnly, ensureTextChannelOption, guildOnly } from './helpers.js';
 
 function assertCountingChannel(context, interaction) {
@@ -19,25 +20,10 @@ const statusCommand = {
   ),
   async execute(context, interaction) {
     await assertCountingChannel(context, interaction);
-    const status = await context.services.counting.getStatus();
     await interaction.reply({
-      content: `Aktuálně: ${status.current}, další: ${status.expected}, rekord: ${status.highScore}, failů: ${status.failedCounts}.`,
+      embeds: [await context.services.counting.getStatusEmbed()],
       flags: MessageFlags.Ephemeral
     });
-  }
-};
-
-const resetCommand = {
-  meta: { category: 'counting', adminOnly: true, hidden: false },
-  data: adminOnly(
-    new SlashCommandBuilder()
-      .setName('counting-reset')
-      .setDescription('Resetuje counting na nulu.')
-  ),
-  async execute(context, interaction) {
-    await assertCountingChannel(context, interaction);
-    await context.services.counting.reset();
-    await interaction.reply({ content: 'Counting resetován.', flags: MessageFlags.Ephemeral });
   }
 };
 
@@ -64,8 +50,20 @@ const blockCommand = {
   async execute(context, interaction) {
     await assertCountingChannel(context, interaction);
     const member = await interaction.guild.members.fetch(interaction.options.getUser('clen').id);
-    await context.services.counting.blockUser(member, interaction.options.getInteger('dny'));
-    await interaction.reply({ content: `${member} je bloknutý.`, flags: MessageFlags.Ephemeral });
+    const days = interaction.options.getInteger('dny');
+    await context.services.counting.blockUser(member, days);
+    await interaction.reply({
+      embeds: [
+        createEmbed({
+          title: '⛔ Uživatel zablokován',
+          description: `${member} byl zablokován v countingu.`,
+          fields: [
+            { name: 'Délka blokace', value: `**${days}** dní`, inline: true }
+          ]
+        })
+      ],
+      flags: MessageFlags.Ephemeral
+    });
   }
 };
 
@@ -78,11 +76,8 @@ const blockListCommand = {
   ),
   async execute(context, interaction) {
     await assertCountingChannel(context, interaction);
-    const blocked = await context.services.counting.listBlocked();
     await interaction.reply({
-      content: blocked.length
-        ? blocked.map((entry) => `<@${entry.userId}> do ${entry.end_time} (${entry.duration_days} dny)`).join('\n')
-        : 'Nikdo blokovaný není.',
+      embeds: [await context.services.counting.getBlockedEmbed()],
       flags: MessageFlags.Ephemeral
     });
   }
@@ -105,7 +100,15 @@ const unblockCommand = {
     await assertCountingChannel(context, interaction);
     const user = interaction.options.getUser('clen');
     await context.services.counting.unblockUser(user.id);
-    await interaction.reply({ content: `${user} odblokován.`, flags: MessageFlags.Ephemeral });
+    await interaction.reply({
+      embeds: [
+        createEmbed({
+          title: '✅ Uživatel odblokován',
+          description: `${user} byl odblokován v countingu.`
+        })
+      ],
+      flags: MessageFlags.Ephemeral
+    });
   }
 };
 
@@ -124,7 +127,15 @@ const setChannelCommand = {
   async execute(context, interaction) {
     const channel = interaction.options.getChannel('kanal', true);
     await context.services.counting.setChannel(channel.id);
-    await interaction.reply({ content: `Counting kanál nastaven na ${channel}.`, flags: MessageFlags.Ephemeral });
+    await interaction.reply({
+      embeds: [
+        createEmbed({
+          title: '📍 Counting kanál nastaven',
+          description: `Nový counting kanál je ${channel}.`
+        })
+      ],
+      flags: MessageFlags.Ephemeral
+    });
   }
 };
 
@@ -136,8 +147,10 @@ const showChannelCommand = {
       .setDescription('Ukáže aktuální counting kanál.')
   ),
   async execute(context, interaction) {
-    const config = await context.configStore.get();
-    await interaction.reply({ content: `Counting kanál: <#${config.counting.channelId}>`, flags: MessageFlags.Ephemeral });
+    await interaction.reply({
+      embeds: [await context.services.counting.getChannelEmbed()],
+      flags: MessageFlags.Ephemeral
+    });
   }
 };
 
@@ -149,7 +162,7 @@ const rulesCommand = {
       .setDescription('Ukáže pravidla countingu.')
   ),
   async execute(context, interaction) {
-    await interaction.reply({ content: context.services.counting.getRulesText() });
+    await interaction.reply({ embeds: [context.services.counting.getRulesEmbed()] });
   }
 };
 
@@ -168,13 +181,9 @@ const statsCommand = {
   ),
   async execute(context, interaction) {
     const user = interaction.options.getUser('clen');
-    const stats = await context.services.counting.getStats(user?.id);
-    const content = user
-      ? (stats
-          ? `${user}: correct ${stats.correct_counts}, wrong ${stats.wrong_counts}, accuracy ${stats.correct_counts + stats.wrong_counts ? Math.round((stats.correct_counts / (stats.correct_counts + stats.wrong_counts)) * 100) : 0}%`
-          : 'Tenhle uživatel zatím nemá counting statistiky.')
-      : stats.map((entry, index) => `${index + 1}. <@${entry.userId}> - ${entry.correct_counts}`).join('\n');
-    await interaction.reply({ content });
+    await interaction.reply({
+      embeds: [await context.services.counting.getStatsEmbed(interaction.guild, user?.id)]
+    });
   }
 };
 
@@ -186,14 +195,13 @@ const formatsCommand = {
       .setDescription('Ukáže podporované formáty čísel.')
   ),
   async execute(context, interaction) {
-    await interaction.reply({ content: context.services.counting.getFormatsText() });
+    await interaction.reply({ embeds: [context.services.counting.getFormatsEmbed()] });
   }
 };
 
 export function getCountingCommands() {
   return [
     statusCommand,
-    resetCommand,
     blockCommand,
     blockListCommand,
     unblockCommand,

@@ -1,3 +1,4 @@
+import { Colors } from 'discord.js';
 import { createEmbed, isAdminMember } from '../../shared/discord-helpers.js';
 import { mentionRole } from '../../shared/utils.js';
 
@@ -29,6 +30,20 @@ function ensureAiUser(store, user) {
 export class AiScoringService {
   constructor(context) {
     this.context = context;
+  }
+
+  async resolveDisplayName(guild, entry) {
+    const cachedMember = guild?.members?.cache?.get(entry.userId);
+    if (cachedMember) {
+      return cachedMember.displayName;
+    }
+
+    const fetchedMember = guild ? await guild.members.fetch(entry.userId).catch(() => null) : null;
+    if (fetchedMember) {
+      return fetchedMember.displayName;
+    }
+
+    return entry.username || `Uživatel ${entry.userId}`;
   }
 
   async handleMessage(message) {
@@ -185,6 +200,105 @@ export class AiScoringService {
       .slice(0, 10);
   }
 
+  async getUserScoreEmbed(user) {
+    const score = await this.getUserScore(user.id);
+    const config = await this.context.configStore.get();
+
+    if (!score) {
+      return createEmbed({
+        title: `🤖 AI skóre - ${user.displayName ?? user.username}`,
+        description: `${user} zatím nemá žádné AI skóre.`,
+        color: Colors.Orange,
+        thumbnail: user.displayAvatarURL?.()
+      });
+    }
+
+    return createEmbed({
+      title: `🤖 AI skóre - ${user.displayName ?? user.username}`,
+      description: 'Hodnocení chování na základě analýzy zpráv pomocí AI.',
+      color: score.total_score >= 0 ? Colors.Blue : Colors.Red,
+      thumbnail: user.displayAvatarURL?.(),
+      footer: 'AI moderační systém',
+      fields: [
+        {
+          name: 'Celkové skóre',
+          value: `**${score.total_score}**`,
+          inline: false
+        },
+        {
+          name: 'Pozitivní body',
+          value: `**${score.positive_score}**`,
+          inline: true
+        },
+        {
+          name: 'Negativní body',
+          value: `**${score.negative_score}**`,
+          inline: true
+        },
+        {
+          name: 'Analyzovaných zpráv',
+          value: `**${score.messages_analyzed}**`,
+          inline: true
+        },
+        {
+          name: 'Hranice pro pozitivní role',
+          value: config.ai.positiveThresholds
+            .map((threshold, index) => `${'🌟'.repeat(index + 1)} Úroveň ${index + 1}: **${threshold}**`)
+            .join('\n'),
+          inline: false
+        },
+        {
+          name: 'Negativní hranice',
+          value: [
+            `⚠️ Varování / role: **${config.ai.negativeThreshold}**`,
+            `⛔ Velmi negativní práh: **${config.ai.veryNegativeThreshold}**`,
+            `🔻 Penalizace navíc: **${config.ai.negativePenalty}**`
+          ].join('\n'),
+          inline: false
+        }
+      ]
+    });
+  }
+
+  async getLeaderboardEmbed(guild, descending = true) {
+    const users = await this.getTopUsers(descending);
+
+    if (!users.length) {
+      return createEmbed({
+        title: descending ? '🏆 AI skóre - Top 10' : '⚠️ AI skóre - Bottom 10',
+        description: 'Zatím nejsou k dispozici žádné statistiky AI moderace.',
+        color: descending ? Colors.Gold : Colors.Red,
+        footer: 'AI moderační systém'
+      });
+    }
+
+    const fields = [];
+
+    for (const [index, entry] of users.entries()) {
+      const displayName = await this.resolveDisplayName(guild, entry);
+      fields.push({
+        name: `${index + 1}. ${displayName}`,
+        value: [
+          `Skóre: **${entry.total_score}**`,
+          `Pozitivní: **${entry.positive_score}**`,
+          `Negativní: **${entry.negative_score}**`,
+          `Zprávy: **${entry.messages_analyzed}**`
+        ].join('\n'),
+        inline: true
+      });
+    }
+
+    return createEmbed({
+      title: descending ? '🏆 AI skóre - Top 10 uživatelů' : '⚠️ AI skóre - Bottom 10 uživatelů',
+      description: descending
+        ? 'Žebříček uživatelů s nejvyšším AI skóre.'
+        : 'Žebříček uživatelů s nejnižším AI skóre.',
+      color: descending ? Colors.Gold : Colors.Red,
+      footer: 'AI moderační systém',
+      fields
+    });
+  }
+
   async syncMemberRoles(member) {
     const config = await this.context.configStore.get();
     const store = await this.context.database.aiModeration.read();
@@ -247,60 +361,41 @@ export class AiScoringService {
     return updated;
   }
 
-  async resetUser(member) {
-    await this.context.database.aiModeration.update((store) => {
-      store.users[member.id] = {
-        username: member.user.username,
-        positive_score: 0,
-        negative_score: 0,
-        total_score: 0,
-        messages_analyzed: 0,
-        last_analyzed: null,
-        timeout_count: 0,
-        last_timeout: null,
-        has_positive_role_1: false,
-        has_positive_role_2: false,
-        has_positive_role_3: false,
-        has_negative_role: false,
-        last_role_update_1: null,
-        last_role_update_2: null,
-        last_role_update_3: null,
-        last_negative_role_update: null
-      };
-      return store;
-    });
-
-    const config = await this.context.configStore.get();
-    const roleIds = [...config.ai.positiveRoleIds, config.ai.negativeRoleId].filter(Boolean);
-    await Promise.all(roleIds.map((roleId) => member.roles.remove(roleId).catch(() => null)));
-  }
-
-  async resetAll(guild) {
-    const config = await this.context.configStore.get();
-    await this.context.database.aiModeration.write({ users: {}, last_updated: new Date().toISOString() });
-    const roleIds = [...config.ai.positiveRoleIds, config.ai.negativeRoleId].filter(Boolean);
-    await guild.members.fetch();
-
-    for (const member of guild.members.cache.values()) {
-      await Promise.all(roleIds.map((roleId) => member.roles.remove(roleId).catch(() => null)));
-    }
-  }
-
   async getRulesEmbed() {
     const config = await this.context.configStore.get();
     return createEmbed({
-      title: 'AI pravidla',
-      description: [
-        `Model: \`${config.ai.model}\``,
-        `Batch size: \`${config.ai.messagesBatch}\``,
-        `Kanály: ${config.ai.moderationChannelIds.map((id) => `<#${id}>`).join(', ') || 'nenastaveno'}`,
-        `Pozitivní role: ${config.ai.positiveThresholds.join(' / ')}`,
-        `Negativní threshold: ${config.ai.negativeThreshold}`,
-        `Velmi negativní threshold: ${config.ai.veryNegativeThreshold}`,
-        `Negativní penalizace: ${config.ai.negativePenalty}`,
-        `Pozitivní role ID: ${config.ai.positiveRoleIds.map(mentionRole).join(', ') || 'nenastaveno'}`,
-        `Negativní role ID: ${mentionRole(config.ai.negativeRoleId)}`
-      ].join('\n')
+      title: '🤖 AI pravidla',
+      description: 'Aktuální konfigurace AI reputačního systému.',
+      color: Colors.Blurple,
+      footer: 'AI moderační systém',
+      fields: [
+        {
+          name: 'Základ',
+          value: [
+            `Model: \`${config.ai.model}\``,
+            `Batch size: \`${config.ai.messagesBatch}\``,
+            `Kanály: ${config.ai.moderationChannelIds.map((id) => `<#${id}>`).join(', ') || 'nenastaveno'}`
+          ].join('\n'),
+          inline: false
+        },
+        {
+          name: 'Pozitivní prahy',
+          value: config.ai.positiveThresholds
+            .map((threshold, index) => `Úroveň ${index + 1}: **${threshold}** (${mentionRole(config.ai.positiveRoleIds[index])})`)
+            .join('\n'),
+          inline: false
+        },
+        {
+          name: 'Negativní logika',
+          value: [
+            `Negativní threshold: **${config.ai.negativeThreshold}**`,
+            `Velmi negativní threshold: **${config.ai.veryNegativeThreshold}**`,
+            `Negativní penalizace: **${config.ai.negativePenalty}**`,
+            `Negativní role: ${mentionRole(config.ai.negativeRoleId)}`
+          ].join('\n'),
+          inline: false
+        }
+      ]
     });
   }
 }

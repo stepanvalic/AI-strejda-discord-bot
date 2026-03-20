@@ -112,7 +112,6 @@ Všichni:
 Admin:
 
 - `/counting-stav` - aktuální stav countingu
-- `/counting-reset` - reset na nulu
 - `/counting-block` - manuální blokace uživatele
 - `/counting-blocklist` - výpis blokovaných
 - `/counting-unblock` - odblokace uživatele
@@ -131,8 +130,6 @@ Admin:
 
 - `/ai-sync-role` - opraví role podle score
 - `/ai-pravidla` - ukáže AI thresholds a konfiguraci
-- `/ai-reset-user` - reset score jednoho člena
-- `/ai-reset-all` - reset score všech
 
 ### Summary
 
@@ -190,7 +187,7 @@ Admin:
 
 - mají přístup k setupu
 - mají moderaci
-- řeší AI resety a sync rolí
+- řeší AI sync rolí
 - řídí denní summary
 - spravují reaction roles
 

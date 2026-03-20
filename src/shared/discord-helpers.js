@@ -5,7 +5,16 @@ export function isAdminMember(member) {
   return Boolean(member?.permissions?.has?.(PermissionFlagsBits.Administrator));
 }
 
-export function createEmbed({ title, description, color = Colors.Blurple, fields = [], footer, timestamp = true }) {
+export function createEmbed({
+  title,
+  description,
+  color = Colors.Blurple,
+  fields = [],
+  footer,
+  timestamp = true,
+  thumbnail,
+  author
+}) {
   const embed = new EmbedBuilder().setColor(color);
 
   if (title) {
@@ -21,6 +30,14 @@ export function createEmbed({ title, description, color = Colors.Blurple, fields
       ...field,
       value: truncate(field.value, 1024)
     })));
+  }
+
+  if (thumbnail) {
+    embed.setThumbnail(thumbnail);
+  }
+
+  if (author) {
+    embed.setAuthor(author);
   }
 
   if (footer) {
