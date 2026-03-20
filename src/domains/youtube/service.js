@@ -244,7 +244,7 @@ export class YoutubeService {
             { name: 'Views', value: String(video.views), inline: true },
             { name: 'Likes', value: String(video.likes), inline: true }
           ]
-        }).setThumbnail(video.thumbnail_url)
+        }).setImage(video.thumbnail_url)
       ]
     };
   }
