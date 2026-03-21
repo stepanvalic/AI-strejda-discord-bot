@@ -62,6 +62,17 @@ function formatMetric(value) {
   return new Intl.NumberFormat('cs-CZ').format(value);
 }
 
+function mergeVideoWithFeedData(video, feedRecord) {
+  return {
+    ...video,
+    title: feedRecord.title || video.title,
+    thumbnail_url: feedRecord.thumbnail_url || video.thumbnail_url,
+    published_at: feedRecord.published_at || video.published_at,
+    channel_title: feedRecord.channel_title || video.channel_title,
+    last_updated: new Date().toISOString()
+  };
+}
+
 export class YoutubeService {
   constructor(context) {
     this.context = context;
@@ -173,6 +184,13 @@ export class YoutubeService {
     };
   }
 
+  async fetchLatestFeedRecord() {
+    const config = await this.context.configStore.get();
+    const channelId = await this.resolveChannelId(config.youtube.channelHandleOrId);
+    const feedVideo = await this.fetchLatestVideoFromFeed(channelId);
+    return normalizeFeedVideoRecord(feedVideo);
+  }
+
   async fetchVideoDetail(videoId) {
     if (!this.context.env.YOUTUBE_API_KEY) {
       return null;
@@ -238,31 +256,7 @@ export class YoutubeService {
   }
 
   async fetchLatestVideo() {
-    const config = await this.context.configStore.get();
-    const channelId = await this.resolveChannelId(config.youtube.channelHandleOrId);
-    const feedVideo = await this.fetchLatestVideoFromFeed(channelId);
-
-    try {
-      const detail = await this.fetchVideoDetail(feedVideo.videoId);
-      if (detail) {
-        return normalizeVideoRecord(detail);
-      }
-    } catch (error) {
-      this.context.logger.warn({ err: error }, 'YouTube detail API selhala, padám na RSS feed.');
-    }
-    const feedRecord = normalizeFeedVideoRecord(feedVideo);
-
-    try {
-      const metrics = await this.fetchVideoMetricsFromPage(feedVideo.videoId);
-      return {
-        ...feedRecord,
-        views: metrics.views,
-        likes: metrics.likes
-      };
-    } catch (error) {
-      this.context.logger.warn({ err: error }, 'YouTube stránka videa selhala, metriky zůstanou neznámé.');
-      return feedRecord;
-    }
+    return this.enrichVideoMetadata(await this.fetchLatestFeedRecord());
   }
 
   async enrichVideoMetadata(video) {
@@ -366,7 +360,18 @@ export class YoutubeService {
   }
 
   async checkLatestAndAnnounce({ force = false } = {}) {
-    const video = await this.fetchLatestVideo();
+    const feedRecord = await this.fetchLatestFeedRecord();
+    const store = await this.context.database.youtube.read();
+    const existing = store.videos.find((entry) => entry.video_id === feedRecord.video_id);
+    const baseVideo = existing ? mergeVideoWithFeedData(existing, feedRecord) : feedRecord;
+
+    await this.saveVideo(baseVideo);
+
+    if (existing?.message_id && !force) {
+      return baseVideo;
+    }
+
+    const video = await this.enrichVideoMetadata(baseVideo);
     await this.saveVideo(video);
     return this.announceVideo(video, force);
   }
