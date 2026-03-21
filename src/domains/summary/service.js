@@ -1,9 +1,55 @@
 import { createEmbed } from '../../shared/discord-helpers.js';
 import { chunkText, formatDateInTimeZone } from '../../shared/utils.js';
 
+const TOKEN_PRICES = {
+  'deepseek-chat': {
+    input: 0.0005,
+    output: 0.0025
+  }
+};
+
+const DEFAULT_TOKEN_PRICE = {
+  input: 0.001,
+  output: 0.002
+};
+
 export class SummaryService {
   constructor(context) {
     this.context = context;
+  }
+
+  calculateTokenCost(model, promptTokens, completionTokens) {
+    const prices = TOKEN_PRICES[model] ?? DEFAULT_TOKEN_PRICE;
+    const inputCost = (promptTokens / 1000) * prices.input;
+    const outputCost = (completionTokens / 1000) * prices.output;
+    return inputCost + outputCost;
+  }
+
+  async recordDeepseekTokenUsage(model, usage, operation) {
+    if (!usage) {
+      return;
+    }
+
+    const promptTokens = usage.prompt_tokens || 0;
+    const completionTokens = usage.completion_tokens || 0;
+    const totalTokens = usage.total_tokens || (promptTokens + completionTokens);
+    const now = new Date();
+
+    await this.context.database.tokenUsage.update((store) => {
+      store.entries.push({
+        timestamp: now.toISOString(),
+        date: now.toISOString().slice(0, 10),
+        time: now.toISOString().slice(11, 19),
+        provider: 'deepseek',
+        model,
+        operation,
+        prompt_tokens: promptTokens,
+        completion_tokens: completionTokens,
+        total_tokens: totalTokens,
+        cost_usd: this.calculateTokenCost(model, promptTokens, completionTokens)
+      });
+      return store;
+    });
   }
 
   buildSummaryChunks(summary) {
@@ -190,21 +236,7 @@ export class SummaryService {
       return this.fallbackSummary(messages);
     }
 
-    await this.context.database.tokenUsage.update((store) => {
-      store.entries.push({
-        timestamp: new Date().toISOString(),
-        date: new Date().toISOString().slice(0, 10),
-        time: new Date().toISOString().slice(11, 19),
-        provider: 'deepseek',
-        model: 'deepseek-chat',
-        operation: 'summary',
-        prompt_tokens: payload.usage?.prompt_tokens || 0,
-        completion_tokens: payload.usage?.completion_tokens || 0,
-        total_tokens: payload.usage?.total_tokens || 0,
-        cost_usd: 0
-      });
-      return store;
-    });
+    await this.recordDeepseekTokenUsage(payload.model || 'deepseek-chat', payload.usage, 'summary');
 
     return {
       summary: this.replaceTopicMarkers(summary, messages),
