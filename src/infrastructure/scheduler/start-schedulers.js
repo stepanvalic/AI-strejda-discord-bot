@@ -18,11 +18,14 @@ export function startSchedulers(context) {
         await context.services.youtube.checkLatestAndAnnounce().catch((error) => {
           context.logger.warn({ err: error }, 'YouTube polling spadl.');
         });
+        await context.services.youtube.refreshRecentVideos().catch((error) => {
+          context.logger.warn({ err: error }, 'YouTube refresh metrik selhal.');
+        });
       }
     } catch (error) {
       context.logger.warn({ err: error }, 'YouTube scheduler spadl.');
     }
-  }, 300_000));
+  }, 60_000));
 
   timers.push(setInterval(async () => {
     try {

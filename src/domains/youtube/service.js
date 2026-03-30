@@ -221,10 +221,12 @@ export class YoutubeService {
     const html = await response.text();
     const views = html.match(/"viewCount":"(\d+)"/u)?.[1];
     const likes = html.match(/"likeCountIfLikedNumber":"(\d+)"/u)?.[1];
+    const comments = html.match(/"commentCount":"(\d+)"/u)?.[1];
 
     return {
       views: views ? Number(views) : null,
-      likes: likes ? Number(likes) : null
+      likes: likes ? Number(likes) : null,
+      comments: comments ? Number(comments) : null
     };
   }
 
@@ -263,13 +265,13 @@ export class YoutubeService {
     try {
       const detail = await this.fetchVideoDetail(video.video_id);
       if (detail) {
-        return {
-          ...video,
-          ...normalizeVideoRecord(detail),
-          message_id: video.message_id ?? null,
-          channel_message_id: video.channel_message_id ?? null,
-          announced_at: video.announced_at ?? null
-        };
+      return {
+        ...video,
+        ...normalizeVideoRecord(detail),
+        message_id: video.message_id ?? null,
+        channel_message_id: video.channel_message_id ?? null,
+        announced_at: video.announced_at ?? null
+      };
       }
     } catch (error) {
       this.context.logger.warn({ err: error }, 'YouTube detail API selhala při obohacení videa.');
@@ -281,6 +283,7 @@ export class YoutubeService {
         ...video,
         views: metrics.views ?? video.views ?? null,
         likes: metrics.likes ?? video.likes ?? null,
+        comments: metrics.comments ?? video.comments ?? null,
         last_updated: new Date().toISOString()
       };
     } catch (error) {
@@ -292,28 +295,93 @@ export class YoutubeService {
     }
   }
 
-  buildNotification(video, pingRoleId) {
-    const liveLabel = video.is_live
-      ? 'Právě běží stream'
-      : video.scheduled_start_time
-        ? 'Naplánovaný stream'
-        : 'Nové video';
+  buildNotificationEmbed(video) {
+    return createEmbed({
+      title: video.is_live
+        ? 'Právě běží stream'
+        : video.scheduled_start_time
+          ? 'Naplánovaný stream'
+          : 'Nové video',
+      color: video.is_live ? Colors.Red : Colors.Blurple,
+      description: `[${video.title}](https://www.youtube.com/watch?v=${video.video_id})`,
+      fields: [
+        { name: 'Kanál', value: video.channel_title, inline: true },
+        { name: 'Zhlédnutí', value: formatMetric(video.views), inline: true },
+        { name: 'Lajky', value: formatMetric(video.likes), inline: true },
+        { name: 'Komentáře', value: formatMetric(video.comments), inline: true }
+      ]
+    });
+  }
 
+  buildNotification(video, pingRoleId) {
     return {
       content: video.scheduled_start_time ? null : (pingRoleId ? `<@&${pingRoleId}>` : '@everyone'),
-      embeds: [
-        createEmbed({
-          title: liveLabel,
-          color: video.is_live ? Colors.Red : Colors.Blurple,
-          description: `[${video.title}](https://www.youtube.com/watch?v=${video.video_id})`,
-          fields: [
-            { name: 'Kanál', value: video.channel_title, inline: true },
-            { name: 'Zhlédnutí', value: formatMetric(video.views), inline: true },
-            { name: 'Lajky', value: formatMetric(video.likes), inline: true }
-          ]
-        }).setImage(video.thumbnail_url)
-      ]
+      embeds: [this.buildNotificationEmbed(video).setImage(video.thumbnail_url)]
     };
+  }
+
+  async enrichVideoStats(video) {
+    const now = new Date().toISOString();
+
+    try {
+      const metrics = await this.fetchVideoMetricsFromPage(video.video_id);
+
+      return {
+        ...video,
+        views: metrics.views ?? video.views ?? null,
+        likes: metrics.likes ?? video.likes ?? null,
+        comments: metrics.comments ?? video.comments ?? null,
+        last_updated: now
+      };
+    } catch (error) {
+      this.context.logger.warn({ err: error }, 'YouTube stránka videa selhala při aktualizaci metrik.');
+      return {
+        ...video,
+        last_updated: now
+      };
+    }
+  }
+
+  async updateAnnouncementMessage(video) {
+    const guild = this.context.client.guilds.cache.get(this.context.guildId);
+
+    if (!guild || !video.channel_message_id || !video.message_id) {
+      return false;
+    }
+
+    const channel = guild.channels.cache.get(video.channel_message_id) ?? await guild.channels.fetch(video.channel_message_id).catch(() => null);
+    if (!channel?.isTextBased?.()) {
+      return false;
+    }
+
+    const message = await channel.messages.fetch(video.message_id).catch(() => null);
+    if (!message) {
+      return false;
+    }
+
+    await message.edit({
+      embeds: [this.buildNotificationEmbed(video).setImage(video.thumbnail_url)]
+    });
+
+    return true;
+  }
+
+  async refreshRecentVideos(limit = 10) {
+    const store = await this.context.database.youtube.read();
+    const tracked = store.videos
+      .filter((video) => video.message_id && video.channel_message_id)
+      .slice(0, limit);
+
+    let updated = 0;
+
+    for (const video of tracked) {
+      const enriched = await this.enrichVideoStats(video);
+      await this.saveVideo(enriched);
+      await this.updateAnnouncementMessage(enriched);
+      updated += 1;
+    }
+
+    return updated;
   }
 
   async saveVideo(video) {
