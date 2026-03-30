@@ -52,6 +52,8 @@ Vyplň hlavně:
 - `summary.sourceChannelId`
 - `summary.targetChannelId`
 - `audit.channelId`
+- `features.setup` (nastavení, jestli mají být setup commandy aktivní)
+- `youtube.checkIntervalSeconds` už se aktuálně nepoužívá, interval je řízen schedulerem na 60 sekund
 
 ### `db/`
 
@@ -60,6 +62,7 @@ Sem se ukládají lokální JSON data bota.
 - bookmarky jsou natvrdo v `db/bookmarks.json`
 - ostatní runtime data jedou podle `DATA_DIR`
 - denní summary se ukládají do `db/sumar/` nebo podle `SUMMARY_DIR`
+- token usage se zapisuje do `db/token_usage.json` ve formátu s `prompt_tokens`, `completion_tokens`, `total_tokens`, `cost_usd`
 
 ## Single-server režim
 
@@ -177,6 +180,12 @@ Admin:
 - `/youtube-refresh` - refreshne metadata posledních videí
 - `/youtube-posli-znovu` - pošle poslední video znovu
 
+### YouTube automatika
+
+- scheduler kontroluje nové video každou minutu
+- po kontrole nového videa se aktualizují metriky posledních 10 odeslaných oznámení (`zhlédnutí`, `lajky`, `komentáře`)
+- metriky se při této aktualizaci přepisují přímo v odeslaných embed zprávách, bez opakovaného pingu
+
 ## Co dělá kdo na pozadí
 
 ### Běžní uživatelé
@@ -220,3 +229,15 @@ Admin:
 - `/summary-den` umí `DD/MM/YYYY` i `YYYY-MM-DD`
 - `/summary-posledni` má cooldown pro běžné uživatele
 - admin cooldown obchází
+
+## DeepSeek tokenová spotřeba
+
+- Každá AI sumarizace přes DeepSeek se zapisuje do `db/token_usage.json`.
+- `cost_usd` se počítá podle interního ceníku:
+  - `deepseek-chat` input: `0.0005 USD / 1 000 tokenů`
+  - `deepseek-chat` output: `0.0025 USD / 1 000 tokenů`
+
+## Setup commandy
+
+- Všechny setup commandy lze globálně vypnout nastavením `"features.setup": false` v `config/runtime.local.json`.
+- Když jsou vypnuté, v registraci Discord commandů se vůbec neukazují.
