@@ -1,133 +1,128 @@
 import { MessageFlags, SlashCommandBuilder } from 'discord.js';
-import { adminOnly } from './helpers.js';
+import { adminOnly, ensureTextChannelOption } from './helpers.js';
+import { chunkText } from '../../shared/utils.js';
 
-const timeoutCommand = {
+async function replyWithChunks(interaction, text) {
+  const chunks = chunkText(text, 1800);
+
+  await interaction.reply({
+    content: chunks[0],
+    flags: MessageFlags.Ephemeral
+  });
+
+  for (const chunk of chunks.slice(1)) {
+    await interaction.followUp({
+      content: chunk,
+      flags: MessageFlags.Ephemeral
+    });
+  }
+}
+
+const moderationStatusCommand = {
   meta: { category: 'moderation', adminOnly: true, hidden: false },
   data: adminOnly(
     new SlashCommandBuilder()
-      .setName('timeout')
-      .setDescription('Udělí člověku timeout.')
-      .addUserOption((option) =>
-        option
-          .setName('clen')
-          .setDescription('Koho timeoutnout.')
-          .setRequired(true)
-      )
-      .addStringOption((option) =>
-        option
-          .setName('delka')
-          .setDescription('Například 5m, 2h nebo 1d12h.')
-          .setRequired(false)
-      )
-      .addStringOption((option) =>
-        option
-          .setName('duvod')
-          .setDescription('Volitelný důvod.')
-          .setRequired(false)
-      )
+      .setName('moderace-stav')
+      .setDescription('Ukáže stav archivu zpráv pro moderaci.')
   ),
   async execute(context, interaction) {
-    const member = await interaction.guild.members.fetch(interaction.options.getUser('clen').id);
-    const embed = await context.services.moderation.timeout(
-      member,
-      interaction.options.getString('delka'),
-      interaction.options.getString('duvod'),
-      interaction.user
-    );
-    await interaction.reply({ embeds: [embed] });
+    const stats = await context.services.moderation.getArchiveStats();
+    const latest = stats.latestMessage
+      ? `${stats.latestMessage.created_at} v #${stats.latestMessage.channel_name || 'neznámý-kanál'}`
+      : 'zatím nic';
+
+    await interaction.reply({
+      content: [
+        'Archiv moderace:',
+        `Celkem zpráv: ${stats.totalMessages}`,
+        `Dnes uložených: ${stats.archivedToday}`,
+        `Unikátních uživatelů: ${stats.uniqueUsers}`,
+        `Kanálů: ${stats.uniqueChannels}`,
+        `Poslední uložená zpráva: ${latest}`
+      ].join('\n'),
+      flags: MessageFlags.Ephemeral
+    });
   }
 };
 
-const untimeoutCommand = {
+const moderationRecentCommand = {
   meta: { category: 'moderation', adminOnly: true, hidden: false },
-  data: adminOnly(
-    new SlashCommandBuilder()
-      .setName('untimeout')
-      .setDescription('Zruší timeout.')
-      .addUserOption((option) =>
-        option
-          .setName('clen')
-          .setDescription('Koho odtimeoutnout.')
-          .setRequired(true)
-      )
-      .addStringOption((option) =>
-        option
-          .setName('duvod')
-          .setDescription('Volitelný důvod.')
-          .setRequired(false)
-      )
+  data: ensureTextChannelOption(
+    adminOnly(
+      new SlashCommandBuilder()
+        .setName('moderace-posledni')
+        .setDescription('Vrátí poslední zprávy z moderačního archivu.')
+        .addIntegerOption((option) =>
+          option
+            .setName('pocet')
+            .setDescription('Kolik zpráv chceš vypsat.')
+            .setRequired(false)
+            .setMinValue(1)
+            .setMaxValue(20)
+        )
+    ),
+    'kanal',
+    'Volitelně filtruj podle kanálu.',
+    false
   ),
   async execute(context, interaction) {
-    const member = await interaction.guild.members.fetch(interaction.options.getUser('clen').id);
-    const embed = await context.services.moderation.untimeout(
-      member,
-      interaction.options.getString('duvod'),
-      interaction.user
+    const count = interaction.options.getInteger('pocet') ?? 10;
+    const channel = interaction.options.getChannel('kanal');
+    const messages = await context.services.moderation.findMessages({
+      limit: count,
+      channelId: channel?.id || null
+    });
+
+    await replyWithChunks(
+      interaction,
+      context.services.moderation.formatMessageList(messages)
     );
-    await interaction.reply({ embeds: [embed] });
   }
 };
 
-const banCommand = {
+const moderationSearchCommand = {
   meta: { category: 'moderation', adminOnly: true, hidden: false },
-  data: adminOnly(
-    new SlashCommandBuilder()
-      .setName('ban')
-      .setDescription('Dá člověku ban.')
-      .addUserOption((option) =>
-        option
-          .setName('clen')
-          .setDescription('Koho zabanovat.')
-          .setRequired(true)
-      )
-      .addStringOption((option) =>
-        option
-          .setName('duvod')
-          .setDescription('Volitelný důvod.')
-          .setRequired(false)
-      )
+  data: ensureTextChannelOption(
+    adminOnly(
+      new SlashCommandBuilder()
+        .setName('moderace-hledat')
+        .setDescription('Hledá text v archivu zpráv.')
+        .addStringOption((option) =>
+          option
+            .setName('text')
+            .setDescription('Hledaný text.')
+            .setRequired(true)
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName('pocet')
+            .setDescription('Maximální počet výsledků.')
+            .setRequired(false)
+            .setMinValue(1)
+            .setMaxValue(20)
+        )
+    ),
+    'kanal',
+    'Volitelně filtruj podle kanálu.',
+    false
   ),
   async execute(context, interaction) {
-    const member = await interaction.guild.members.fetch(interaction.options.getUser('clen').id);
-    const embed = await context.services.moderation.ban(
-      member,
-      interaction.options.getString('duvod'),
-      interaction.user
-    );
-    await interaction.reply({ embeds: [embed] });
-  }
-};
+    const query = interaction.options.getString('text', true);
+    const count = interaction.options.getInteger('pocet') ?? 10;
+    const channel = interaction.options.getChannel('kanal');
+    const messages = await context.services.moderation.findMessages({
+      limit: count,
+      query,
+      channelId: channel?.id || null
+    });
 
-const unbanCommand = {
-  meta: { category: 'moderation', adminOnly: true, hidden: false },
-  data: adminOnly(
-    new SlashCommandBuilder()
-      .setName('unban')
-      .setDescription('Odbanuje uživatele podle ID.')
-      .addStringOption((option) =>
-        option
-          .setName('user-id')
-          .setDescription('Discord user ID.')
-          .setRequired(true)
-      )
-      .addStringOption((option) =>
-        option
-          .setName('duvod')
-          .setDescription('Volitelný důvod.')
-          .setRequired(false)
-      )
-  ),
-  async execute(context, interaction) {
-    const embed = await context.services.moderation.unban(
-      interaction.guild,
-      interaction.options.getString('user-id'),
-      interaction.options.getString('duvod'),
-      interaction.user
+    await replyWithChunks(
+      interaction,
+      `Výsledky pro "${query}":\n${context.services.moderation.formatMessageList(messages)}`
     );
-    await interaction.reply({ embeds: [embed] });
   }
 };
 
 export function getModerationCommands() {
-  return [timeoutCommand, untimeoutCommand, banCommand, unbanCommand];
+  return [moderationStatusCommand, moderationRecentCommand, moderationSearchCommand];
 }

@@ -90,21 +90,22 @@ export function registerEventHandlers(context) {
         return;
       }
 
-      const blocked = await services.wordFilter.handleMessage(message);
-      if (blocked) {
-        return;
-      }
-
+      await services.moderation.archiveMessage(message);
       await services.summary.captureMessage(message);
       await services.counting.handleMessage(message);
-      await services.ai.handleMessage(message);
     } catch (error) {
       logger.warn({ err: error }, 'Message pipeline spadla.');
     }
   });
 
   client.on(Events.MessageDelete, async (message) => {
-    if (!message.guild || message.guild.id !== context.guildId || message.author?.bot) {
+    if (!message.guild || message.guild.id !== context.guildId) {
+      return;
+    }
+
+    await services.moderation.markMessageDeleted(message).catch(() => null);
+
+    if (message.author?.bot) {
       return;
     }
 
@@ -113,7 +114,13 @@ export function registerEventHandlers(context) {
   });
 
   client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
-    if (!newMessage.guild || newMessage.guild.id !== context.guildId || newMessage.author?.bot) {
+    if (!newMessage.guild || newMessage.guild.id !== context.guildId) {
+      return;
+    }
+
+    await services.moderation.updateArchivedMessage(newMessage).catch(() => null);
+
+    if (newMessage.author?.bot) {
       return;
     }
 

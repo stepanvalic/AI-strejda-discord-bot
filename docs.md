@@ -99,10 +99,9 @@ Admin:
 
 Admin:
 
-- `/timeout` - timeout člena
-- `/untimeout` - zruší timeout
-- `/ban` - banuje člena
-- `/unban` - unban podle user ID
+- `/moderace-stav` - ukáže stav archivu zpráv
+- `/moderace-posledni` - vrátí poslední uložené zprávy
+- `/moderace-hledat` - hledá text v archivu zpráv
 
 ### Counting
 
@@ -208,9 +207,9 @@ Admin:
 
 - welcome flow běží automaticky 24/7 na `GuildMemberAdd`
 - reaction roles poslouchají add/remove reakcí
-- word filter maže blacklistovaná slova
+- moderace pasivně archivuje všechny zprávy do `db/moderation_messages.json`
 - counting běží jen v `counting.channelId`
-- AI scoring běží jen v `ai.moderationChannelIds`
+- AI scoring zůstává dostupný přes commandy, ale pipeline zpráv ho automaticky nespouští
 - summary ukládá zprávy jen z `summary.sourceChannelId`
 - YouTube polling jede intervalově
 - daily summary se generuje v hodinu `summary.dailyHour`
