@@ -29,7 +29,7 @@ export function registerEventHandlers(context) {
 
   client.once(Events.ClientReady, async () => {
     logger.info({ user: client.user.tag }, 'Discord klient je ready.');
-    await services.utility.setPresence().catch((error) => logger.warn({ err: error }, 'Nepodarilo se nastavit activity.'));
+    await services.utility.setPresence().catch((error) => logger.warn({ err: error }, 'Nepodařilo se nastavit activity.'));
     const config = await context.configStore.get();
     const guild = client.guilds.cache.get(context.guildId);
 
@@ -67,7 +67,7 @@ export function registerEventHandlers(context) {
     }
 
     try {
-      logger.info({ command: interaction.commandName, user: interaction.user.id }, 'Slash command zavolany.');
+      logger.info({ command: interaction.commandName, user: interaction.user.id }, 'Slash command zavolaný.');
       await command.execute(context, interaction);
     } catch (error) {
       logger.error({ err: error, command: interaction.commandName }, 'Slash command spadl.');
