@@ -4,6 +4,11 @@ import { createEmbed, fetchTextChannel, normalizeEmoji } from '../../shared/disc
 export class ReactionRoleService {
   constructor(context) {
     this.context = context;
+    this.recentAdds = new Map();
+  }
+
+  createRecentAddKey(messageId, userId, emoji) {
+    return `${messageId}:${userId}:${normalizeEmoji(emoji)}`;
   }
 
   async setChannelAndSyncMessage(guild, channelId) {
@@ -86,9 +91,26 @@ export class ReactionRoleService {
       return;
     }
 
+    const recentAddKey = this.createRecentAddKey(reaction.message.id, user.id, reaction.emoji);
+
     if (addRole) {
-      await member.roles.add(mapping.roleId, 'Reaction role add');
-    } else {
+      this.recentAdds.set(recentAddKey, Date.now());
+
+      if (!member.roles.cache.has(mapping.roleId)) {
+        await member.roles.add(mapping.roleId, 'Reaction role add');
+      }
+
+      return;
+    }
+
+    const recentAddAt = this.recentAdds.get(recentAddKey);
+    if (recentAddAt && (Date.now() - recentAddAt) < 5000) {
+      return;
+    }
+
+    this.recentAdds.delete(recentAddKey);
+
+    if (member.roles.cache.has(mapping.roleId)) {
       await member.roles.remove(mapping.roleId, 'Reaction role remove');
     }
   }
