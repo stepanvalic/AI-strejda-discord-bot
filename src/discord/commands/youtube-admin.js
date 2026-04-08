@@ -10,8 +10,14 @@ const youtubeCheckCommand = {
   ),
   async execute(context, interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const video = await context.services.youtube.checkLatestAndAnnounce();
-    await interaction.editReply(`Nejnovější video zkontrolováno: ${video.video_id}.`);
+    const result = await context.services.youtube.checkLatestAndAnnounce();
+
+    if (result.announced_count > 0) {
+      await interaction.editReply(`Zkontrolováno. Oznámil jsem ${result.announced_count} videí. Poslední zpracované je ${result.video_id}.`);
+      return;
+    }
+
+    await interaction.editReply(`Zkontrolováno. Nic nového k oznámení, poslední video je ${result.latest_video_id}.`);
   }
 };
 

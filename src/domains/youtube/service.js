@@ -54,6 +54,37 @@ function normalizeFeedVideoRecord(feedVideo) {
   };
 }
 
+function parseFeedEntries(xml, limit = 10) {
+  const entries = [];
+
+  for (const match of xml.matchAll(/<entry>([\s\S]*?)<\/entry>/gu)) {
+    const entry = match[1];
+    const videoId = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/u)?.[1];
+    const title = decodeXmlEntities(entry.match(/<title>([^<]+)<\/title>/u)?.[1] ?? '');
+    const author = decodeXmlEntities(entry.match(/<name>([^<]+)<\/name>/u)?.[1] ?? '');
+    const publishedAt = entry.match(/<published>([^<]+)<\/published>/u)?.[1] ?? new Date().toISOString();
+    const thumbnailUrl = entry.match(/<media:thumbnail url="([^"]+)"/u)?.[1] ?? '';
+
+    if (!videoId || !title) {
+      continue;
+    }
+
+    entries.push({
+      videoId,
+      title,
+      author,
+      publishedAt,
+      thumbnailUrl
+    });
+
+    if (entries.length >= limit) {
+      break;
+    }
+  }
+
+  return entries;
+}
+
 function formatMetric(value) {
   if (value === null || value === undefined) {
     return 'nezjištěno';
@@ -147,6 +178,16 @@ export class YoutubeService {
   }
 
   async fetchLatestVideoFromFeed(channelId) {
+    const [latest] = await this.fetchRecentVideosFromFeed(channelId, 1);
+
+    if (!latest) {
+      throw new Error('V YouTube feedu není žádné video.');
+    }
+
+    return latest;
+  }
+
+  async fetchRecentVideosFromFeed(channelId, limit = 10) {
     const response = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`, {
       headers: {
         'User-Agent': 'Mozilla/5.0'
@@ -158,30 +199,13 @@ export class YoutubeService {
     }
 
     const xml = await response.text();
-    const entryMatch = xml.match(/<entry>([\s\S]*?)<\/entry>/u);
+    const entries = parseFeedEntries(xml, limit);
 
-    if (!entryMatch?.[1]) {
+    if (entries.length === 0) {
       throw new Error('V YouTube feedu není žádné video.');
     }
 
-    const entry = entryMatch[1];
-    const videoId = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/u)?.[1];
-    const title = decodeXmlEntities(entry.match(/<title>([^<]+)<\/title>/u)?.[1] ?? '');
-    const author = decodeXmlEntities(entry.match(/<name>([^<]+)<\/name>/u)?.[1] ?? '');
-    const publishedAt = entry.match(/<published>([^<]+)<\/published>/u)?.[1] ?? new Date().toISOString();
-    const thumbnailUrl = entry.match(/<media:thumbnail url="([^"]+)"/u)?.[1] ?? '';
-
-    if (!videoId || !title) {
-      throw new Error('V YouTube feedu chybí data o posledním videu.');
-    }
-
-    return {
-      videoId,
-      title,
-      author,
-      publishedAt,
-      thumbnailUrl
-    };
+    return entries;
   }
 
   async fetchLatestFeedRecord() {
@@ -189,6 +213,13 @@ export class YoutubeService {
     const channelId = await this.resolveChannelId(config.youtube.channelHandleOrId);
     const feedVideo = await this.fetchLatestVideoFromFeed(channelId);
     return normalizeFeedVideoRecord(feedVideo);
+  }
+
+  async fetchRecentFeedRecords(limit = 10) {
+    const config = await this.context.configStore.get();
+    const channelId = await this.resolveChannelId(config.youtube.channelHandleOrId);
+    const feedVideos = await this.fetchRecentVideosFromFeed(channelId, limit);
+    return feedVideos.map((video) => normalizeFeedVideoRecord(video));
   }
 
   async fetchVideoDetail(videoId) {
@@ -394,8 +425,24 @@ export class YoutubeService {
         store.videos[existingIndex] = { ...store.videos[existingIndex], ...video };
       }
 
+      store.videos.sort((left, right) => {
+        const leftTime = Date.parse(left.published_at || left.announced_at || '') || 0;
+        const rightTime = Date.parse(right.published_at || right.announced_at || '') || 0;
+        return rightTime - leftTime;
+      });
+
       return store;
     });
+  }
+
+  isWithinAnnounceWindow(publishedAt, maxAgeHours) {
+    const publishedTime = new Date(publishedAt).getTime();
+
+    if (!Number.isFinite(publishedTime)) {
+      return true;
+    }
+
+    return (Date.now() - publishedTime) <= maxAgeHours * 3_600_000;
   }
 
   async announceVideo(video, force = false) {
@@ -428,20 +475,49 @@ export class YoutubeService {
   }
 
   async checkLatestAndAnnounce({ force = false } = {}) {
-    const feedRecord = await this.fetchLatestFeedRecord();
+    const config = await this.context.configStore.get();
+    const feedRecords = await this.fetchRecentFeedRecords(10);
     const store = await this.context.database.youtube.read();
-    const existing = store.videos.find((entry) => entry.video_id === feedRecord.video_id);
-    const baseVideo = existing ? mergeVideoWithFeedData(existing, feedRecord) : feedRecord;
+    const existingById = new Map(store.videos.map((entry) => [entry.video_id, entry]));
+    const baseVideos = [];
 
-    await this.saveVideo(baseVideo);
-
-    if (existing?.message_id && !force) {
-      return baseVideo;
+    for (const feedRecord of feedRecords) {
+      const existing = existingById.get(feedRecord.video_id);
+      const baseVideo = existing ? mergeVideoWithFeedData(existing, feedRecord) : feedRecord;
+      await this.saveVideo(baseVideo);
+      baseVideos.push(baseVideo);
     }
 
-    const video = await this.enrichVideoMetadata(baseVideo);
-    await this.saveVideo(video);
-    return this.announceVideo(video, force);
+    const latestVideo = baseVideos[0];
+
+    if (!latestVideo) {
+      throw new Error('V YouTube feedu není žádné video.');
+    }
+
+    const candidates = force
+      ? [latestVideo]
+      : baseVideos
+        .filter((video) => {
+          const existing = existingById.get(video.video_id);
+          return !existing?.message_id && this.isWithinAnnounceWindow(video.published_at, config.youtube.newVideoMaxAgeHours);
+        })
+        .sort((left, right) => new Date(left.published_at).getTime() - new Date(right.published_at).getTime());
+
+    let lastProcessedVideo = latestVideo;
+    let announcedCount = 0;
+
+    for (const candidate of candidates) {
+      const video = await this.enrichVideoMetadata(candidate);
+      await this.saveVideo(video);
+      lastProcessedVideo = await this.announceVideo(video, force);
+      announcedCount += 1;
+    }
+
+    return {
+      ...lastProcessedVideo,
+      announced_count: announcedCount,
+      latest_video_id: latestVideo.video_id
+    };
   }
 
   async refreshAnnouncements() {

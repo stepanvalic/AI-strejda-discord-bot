@@ -47,3 +47,40 @@ config/
 - `db/` a `docs/` zůstávají lokální a ignorované v gitu.
 - Runtime config je zapisovatelný, aby setup slash commandy uměly měnit channel/message ID.
 - Pro summary a AI integrace je připravený fetch-based client, ale bez tokenů se jen bezpečně vypnou.
+
+## Odškrtávací seznam testů
+
+- [x] Router a registrace slash commandů
+  - [x] Bot se úspěšně připojí po `npm start`.
+  - [x] Registrace commandů proběhne bez chyb (`npm run register:commands`).
+  - [x] `/` příkazy se zobrazí v serveru a vrací odpověď bez internal error.
+- [ ] Doména: `welcome`
+  - [ ] Přivítání se spustí na `guildMemberAdd`.
+  - [ ] Odesláná zpráva je ve správném kanálu a s nastavenými parametry.
+- [ ] Doména: `moderation`
+  - [ ] Příkazy pro timeoute/ban/kick/reply se vykonávají jen s oprávněním.
+  - [ ] Logging akce/moderace se uloží podle očekávání.
+- [ ] Doména: `counting`
+  - [ ] Pořadí zpráv a ochrana proti duplicitám funguje.
+  - [ ] Konfigurace kanálu přes runtime config drží stav i po restartu.
+- [ ] Doména: `AI score`
+  - [ ] Výpočet skóre vrací rozumné hodnoty při validních datech.
+  - [ ] Při chybějících přihlašovacích údajích se modul bezpečně vypne a bot nekoliduje.
+- [ ] Doména: `summary`
+  - [ ] Denní/periodický souhrn se vygeneruje podle plánu.
+  - [ ] Výsledek se pošle do cílového kanálu a formát odpovídá.
+- [ ] Doména: `YouTube`
+  - [ ] Poller správně zpracuje nový upload a nehlásí false positive.
+  - [ ] Notifikace se neposílají mimo nastavený seznam kanálů.
+- [ ] Doména: `bookmarky`
+  - [ ] Uložení bookmarku a zobrazení funguje i po restartu.
+  - [ ] Validace vstupu zachytí prázdný/špatný odkaz.
+- [ ] Doména: `reaction roles`
+  - [ ] Přidání/odebrání role při reakci funguje.
+  - [ ] Ošetření chyb (neautorizovaný bot, invalid role, missing permission) je stabilní.
+- [ ] Datová vrstva `db/*.json`
+  - [ ] Zápis změn je atomický a soubory se nepokazí při paralelním přístupu.
+  - [ ] Migrace / kompatibilita se staršími záznamy drží konzistenci.
+- [ ] Scheduler
+  - [ ] Cron joby se spustí po startu a po změně nastavení se přepnou.
+  - [ ] Na opakované spuštění botu nedojde k duplikaci úloh.

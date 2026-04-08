@@ -1,5 +1,33 @@
 export function startSchedulers(context) {
   const timers = [];
+  const runYoutubeCheck = async () => {
+    try {
+      const config = await context.configStore.get();
+      if (!config.features.youtube) {
+        return;
+      }
+
+      await context.services.youtube.checkLatestAndAnnounce().catch((error) => {
+        context.logger.warn({ err: error }, 'YouTube polling spadl.');
+      });
+    } catch (error) {
+      context.logger.warn({ err: error }, 'YouTube scheduler spadl.');
+    }
+  };
+  const runYoutubeRefresh = async () => {
+    try {
+      const config = await context.configStore.get();
+      if (!config.features.youtube) {
+        return;
+      }
+
+      await context.services.youtube.refreshRecentVideos().catch((error) => {
+        context.logger.warn({ err: error }, 'YouTube refresh metrik selhal.');
+      });
+    } catch (error) {
+      context.logger.warn({ err: error }, 'YouTube refresh scheduler spadl.');
+    }
+  };
 
   timers.push(setInterval(async () => {
     try {
@@ -11,19 +39,32 @@ export function startSchedulers(context) {
     }
   }, 300_000));
 
+  context.runtime.lastYoutubeCheckAt = Date.now();
+  context.runtime.lastYoutubeRefreshAt = Date.now();
+  void runYoutubeCheck();
+
   timers.push(setInterval(async () => {
     try {
       const config = await context.configStore.get();
-      if (config.features.youtube) {
-        await context.services.youtube.checkLatestAndAnnounce().catch((error) => {
-          context.logger.warn({ err: error }, 'YouTube polling spadl.');
-        });
-        await context.services.youtube.refreshRecentVideos().catch((error) => {
-          context.logger.warn({ err: error }, 'YouTube refresh metrik selhal.');
-        });
+      if (!config.features.youtube) {
+        return;
+      }
+
+      const now = Date.now();
+      const checkIntervalMs = config.youtube.checkIntervalSeconds * 1000;
+      const refreshIntervalMs = config.youtube.refreshIntervalSeconds * 1000;
+
+      if ((now - context.runtime.lastYoutubeCheckAt) >= checkIntervalMs) {
+        context.runtime.lastYoutubeCheckAt = now;
+        await runYoutubeCheck();
+      }
+
+      if ((now - context.runtime.lastYoutubeRefreshAt) >= refreshIntervalMs) {
+        context.runtime.lastYoutubeRefreshAt = now;
+        await runYoutubeRefresh();
       }
     } catch (error) {
-      context.logger.warn({ err: error }, 'YouTube scheduler spadl.');
+      context.logger.warn({ err: error }, 'YouTube scheduler dispatcher spadl.');
     }
   }, 60_000));
 
