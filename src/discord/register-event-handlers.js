@@ -23,10 +23,6 @@ export function getClientOptions() {
 export function registerEventHandlers(context) {
   const { client, logger, services } = context;
 
-  context.internalEvents.on('audit:moderation', async (payload) => {
-    await services.audit.logModerationEvent(payload).catch((error) => logger.warn({ err: error }, 'Audit moderation selhal.'));
-  });
-
   client.once(Events.ClientReady, async () => {
     logger.info({ user: client.user.tag }, 'Discord klient je ready.');
     await services.utility.setPresence().catch((error) => logger.warn({ err: error }, 'Nepodařilo se nastavit activity.'));
@@ -90,7 +86,6 @@ export function registerEventHandlers(context) {
         return;
       }
 
-      await services.moderation.archiveMessage(message);
       await services.summary.captureMessage(message);
       await services.counting.handleMessage(message);
     } catch (error) {
@@ -102,8 +97,6 @@ export function registerEventHandlers(context) {
     if (!message.guild || message.guild.id !== context.guildId) {
       return;
     }
-
-    await services.moderation.markMessageDeleted(message).catch(() => null);
 
     if (message.author?.bot) {
       return;
@@ -117,8 +110,6 @@ export function registerEventHandlers(context) {
     if (!newMessage.guild || newMessage.guild.id !== context.guildId) {
       return;
     }
-
-    await services.moderation.updateArchivedMessage(newMessage).catch(() => null);
 
     if (newMessage.author?.bot) {
       return;

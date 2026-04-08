@@ -1,7 +1,6 @@
 import { getAiCommands } from './ai.js';
 import { getBookmarkCommands } from './bookmarks.js';
 import { getCountingCommands } from './counting.js';
-import { getModerationCommands } from './moderation.js';
 import { getOnboardingCommands } from './onboarding.js';
 import { getSetupCommands } from './setup.js';
 import { getSummaryCommands } from './summary.js';
@@ -12,7 +11,6 @@ export function getCommands(config) {
   const commands = [
     ...getUtilityCommands(),
     ...getOnboardingCommands(),
-    ...getModerationCommands(),
     ...getCountingCommands(),
     ...getAiCommands(),
     ...getSummaryCommands(),

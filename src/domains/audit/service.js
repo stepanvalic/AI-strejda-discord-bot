@@ -21,29 +21,6 @@ export class AuditService {
     return channel.send({ embeds: [embed] });
   }
 
-  async logModerationEvent(payload) {
-    const guild = this.context.client.guilds.cache.first();
-    if (!guild) {
-      return;
-    }
-
-    const embed = createEmbed({
-      title: `Moderace: ${payload.type}`,
-      color: Colors.DarkOrange,
-      fields: [
-        { name: 'Target', value: mentionUser(payload.targetId), inline: true },
-        { name: 'Moderator', value: mentionUser(payload.moderatorId), inline: true },
-        { name: 'Důvod', value: payload.reason || 'neuveden' }
-      ]
-    });
-
-    if (payload.durationMs) {
-      embed.addFields({ name: 'Délka', value: `${Math.round(payload.durationMs / 60000)} minut`, inline: true });
-    }
-
-    await this.send(guild, embed);
-  }
-
   async logMessageDelete(message) {
     await this.send(message.guild, createEmbed({
       title: 'Smazaná zpráva',

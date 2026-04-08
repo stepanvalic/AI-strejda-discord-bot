@@ -95,14 +95,6 @@ Admin:
 - `/doplnit-default-roli` - doplní default roli všem
 - `/reaction-roles-sync` - znovu vytvoří nebo upraví reaction role panel
 
-### Moderation
-
-Admin:
-
-- `/moderace-stav` - ukáže stav archivu zpráv
-- `/moderace-posledni` - vrátí poslední uložené zprávy
-- `/moderace-hledat` - hledá text v archivu zpráv
-
 ### Counting
 
 Všichni:
@@ -198,7 +190,6 @@ Admin:
 ### Admini
 
 - mají přístup k setupu
-- mají moderaci
 - řeší AI sync rolí
 - řídí denní summary
 - spravují reaction roles
@@ -207,7 +198,6 @@ Admin:
 
 - welcome flow běží automaticky 24/7 na `GuildMemberAdd`
 - reaction roles poslouchají add/remove reakcí
-- moderace pasivně archivuje všechny zprávy do `db/moderation_messages.json`
 - counting běží jen v `counting.channelId`
 - AI scoring zůstává dostupný přes commandy, ale pipeline zpráv ho automaticky nespouští
 - summary ukládá zprávy jen z `summary.sourceChannelId`

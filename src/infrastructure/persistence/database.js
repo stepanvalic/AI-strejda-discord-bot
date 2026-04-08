@@ -29,9 +29,6 @@ export class JsonDatabase {
       messages: [],
       summaries: []
     }));
-    this.moderationArchive = new JsonFileStore(path.join(this.dataDir, 'moderation_messages.json'), () => ({
-      messages: []
-    }));
     this.blacklist = new JsonFileStore(path.join(this.dataDir, 'blacklist_words.json'), () => ({
       blacklisted_words: []
     }));
@@ -82,7 +79,6 @@ export class JsonDatabase {
       this.aiModeration.read(),
       this.youtube.read(),
       this.chatMessages.read(),
-      this.moderationArchive.read(),
       this.blacklist.read(),
       this.filteredWords.read(),
       this.bookmarks.read(),
