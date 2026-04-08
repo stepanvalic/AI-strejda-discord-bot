@@ -54,6 +54,16 @@ function normalizeFeedVideoRecord(feedVideo) {
   };
 }
 
+function normalizeApiVideoSearchRecord(item) {
+  return {
+    videoId: item.id?.videoId,
+    title: item.snippet?.title ?? '',
+    author: item.snippet?.channelTitle ?? '',
+    publishedAt: item.snippet?.publishedAt ?? new Date().toISOString(),
+    thumbnailUrl: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url || ''
+  };
+}
+
 function parseFeedEntries(xml, limit = 10) {
   const entries = [];
 
@@ -107,6 +117,29 @@ function mergeVideoWithFeedData(video, feedRecord) {
 export class YoutubeService {
   constructor(context) {
     this.context = context;
+  }
+
+  async resolveChannelIdFromHandle(handle) {
+    if (!this.context.env.YOUTUBE_API_KEY) {
+      throw new Error('Chybí YOUTUBE_API_KEY pro překlad YouTube handle.');
+    }
+
+    const cleanHandle = handle.replace(/^@/u, '').trim();
+    const response = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${encodeURIComponent(cleanHandle)}&key=${this.context.env.YOUTUBE_API_KEY}`);
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error?.message || `YouTube channels API vrátila ${response.status}.`);
+    }
+
+    const payload = await response.json();
+    const channelId = payload.items?.[0]?.id;
+
+    if (!channelId) {
+      throw new Error('Nepodařilo se najít YouTube kanál podle handle.');
+    }
+
+    return channelId;
   }
 
   normalizeChannelInput(handleOrId) {
@@ -187,6 +220,31 @@ export class YoutubeService {
     return latest;
   }
 
+  async fetchRecentVideosFromApi(channelId, limit = 10) {
+    if (!this.context.env.YOUTUBE_API_KEY) {
+      throw new Error('Chybí YOUTUBE_API_KEY pro načtení videí z YouTube API.');
+    }
+
+    const maxResults = Math.min(Math.max(limit, 1), 50);
+    const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${encodeURIComponent(channelId)}&order=date&type=video&maxResults=${maxResults}&key=${this.context.env.YOUTUBE_API_KEY}`);
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error?.message || `YouTube search API vrátila ${response.status}.`);
+    }
+
+    const payload = await response.json();
+    const videos = (payload.items ?? [])
+      .map((item) => normalizeApiVideoSearchRecord(item))
+      .filter((item) => item.videoId && item.title);
+
+    if (videos.length === 0) {
+      throw new Error('V YouTube API není žádné video.');
+    }
+
+    return videos;
+  }
+
   async fetchRecentVideosFromFeed(channelId, limit = 10) {
     const response = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`, {
       headers: {
@@ -209,15 +267,26 @@ export class YoutubeService {
   }
 
   async fetchLatestFeedRecord() {
-    const config = await this.context.configStore.get();
-    const channelId = await this.resolveChannelId(config.youtube.channelHandleOrId);
-    const feedVideo = await this.fetchLatestVideoFromFeed(channelId);
-    return normalizeFeedVideoRecord(feedVideo);
+    const [video] = await this.fetchRecentFeedRecords(1);
+
+    if (!video) {
+      throw new Error('V YouTube zdroji není žádné video.');
+    }
+
+    return video;
   }
 
   async fetchRecentFeedRecords(limit = 10) {
     const config = await this.context.configStore.get();
     const channelId = await this.resolveChannelId(config.youtube.channelHandleOrId);
+
+    try {
+      const apiVideos = await this.fetchRecentVideosFromApi(channelId, limit);
+      return apiVideos.map((video) => normalizeFeedVideoRecord(video));
+    } catch (error) {
+      this.context.logger.warn({ err: error, channelId }, 'YouTube API načtení videí selhalo, padám zpět na RSS feed.');
+    }
+
     const feedVideos = await this.fetchRecentVideosFromFeed(channelId, limit);
     return feedVideos.map((video) => normalizeFeedVideoRecord(video));
   }
@@ -273,6 +342,15 @@ export class YoutubeService {
     }
 
     if (normalized.type === 'handleUrl') {
+      if (this.context.env.YOUTUBE_API_KEY) {
+        try {
+          const handle = new URL(normalized.value).pathname.replace(/^\/@/u, '');
+          return await this.resolveChannelIdFromHandle(handle);
+        } catch (error) {
+          this.context.logger.warn({ err: error, value: normalized.value }, 'YouTube handle API překlad selhal, zkouším parsování stránky.');
+        }
+      }
+
       return this.resolveChannelIdFromPage(normalized.value);
     }
 
