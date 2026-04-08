@@ -63,6 +63,21 @@ const reactionRoleSyncCommand = {
   }
 };
 
+const welcomeTestCommand = {
+  meta: { category: 'onboarding', adminOnly: true, hidden: false },
+  data: adminOnly(
+    new SlashCommandBuilder()
+      .setName('welcome-test')
+      .setDescription('Pošle testovací welcome zprávu do aktuálního kanálu.')
+  ),
+  async execute(context, interaction) {
+    const member = await interaction.guild.members.fetch(interaction.user.id);
+    await interaction.reply({
+      embeds: [context.services.welcome.buildWelcomeEmbed(member)]
+    });
+  }
+};
+
 export function getOnboardingCommands() {
-  return [fillDefaultRolesCommand, reactionRoleSyncCommand];
+  return [fillDefaultRolesCommand, reactionRoleSyncCommand, welcomeTestCommand];
 }
