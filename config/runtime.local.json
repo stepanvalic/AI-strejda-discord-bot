@@ -1,0 +1,106 @@
+{
+  "guild": {
+    "guildId": "1093414289408262144",
+    "welcomeChannelId": "1484186798640074802",
+    "defaultRoleId": "1351783676081340466"
+  },
+  "discord": {
+    "activityTexts": [
+      "{count} kočičkářů",
+      "{count} darebáků",
+      "{count} obránců cat army"
+    ],
+    "rules": [
+      "Buď normální člověk a nech se s ostatními žít.",
+      "Nepostuj bordel, který bys nechtěl vidět i ty.",
+      "Counting kanál není ruleta, tam se počítá po jedné."
+    ],
+    "inviteMaxAgeSeconds": 0,
+    "inviteMaxUses": 0
+  },
+  "reactionRoles": {
+    "channelId": "1484189177158307941",
+    "messageId": "1484661449623207986",
+    "mappings": [
+      {
+        "roleId": "123456789012345682",
+        "emoji": "📺",
+        "description": "Ping na nová videa"
+      },
+      {
+        "roleId": "123456789012345683",
+        "emoji": "🤖",
+        "description": "Role pro AI nerdy"
+      }
+    ]
+  },
+  "youtube": {
+    "channelHandleOrId": "https://www.youtube.com/@tvvalickovi",
+    "notificationChannelId": "1484649744834887713",
+    "pingRoleId": "1093415197059846164",
+    "checkIntervalSeconds": 300,
+    "refreshIntervalSeconds": 1800,
+    "newVideoMaxAgeHours": 24
+  },
+  "counting": {
+    "channelId": "1484649833896611891",
+    "topicPrefix": "Aktuální counting kanál",
+    "slowmodeSeconds": 0
+  },
+  "ai": {
+    "enabled": true,
+    "model": "gemini-2.5-flash",
+    "messagesBatch": 8,
+    "moderationChannelIds": [
+      "1484649926435541013"
+    ],
+    "positiveThresholds": [
+      2500,
+      5000,
+      10000
+    ],
+    "negativeThreshold": -1500,
+    "veryNegativeThreshold": 80,
+    "negativePenalty": 150,
+    "positiveRoleIds": [
+      "123456789012345688",
+      "123456789012345689",
+      "123456789012345690"
+    ],
+    "negativeRoleId": "123456789012345691"
+  },
+  "summary": {
+    "enabled": true,
+    "provider": "deepseek",
+    "sourceChannelId": "1484649926435541013",
+    "targetChannelId": "1484650056236666930",
+    "cooldownHours": 6,
+    "dailyHour": 3,
+    "retentionDays": 30,
+    "debug": false
+  },
+  "audit": {
+    "enabled": true,
+    "channelId": "1484650146091237611"
+  },
+  "features": {
+    "setup": false,
+    "reactionRoles": true,
+    "wordFilter": true,
+    "bookmarks": true,
+    "counting": true,
+    "youtube": true,
+    "ai": true,
+    "summary": true,
+    "audit": true
+  },
+  "setup": {
+    "channelNames": {
+      "youtube": "youtube-notifikace",
+      "counting": "counting",
+      "summary": "daily-shrnuti",
+      "audit": "audit-log"
+    },
+    "categoryName": "strejda"
+  }
+}
