@@ -54,12 +54,9 @@ config/
   - [x] Bot se úspěšně připojí po `npm start`.
   - [x] Registrace commandů proběhne bez chyb (`npm run register:commands`).
   - [x] `/` příkazy se zobrazí v serveru a vrací odpověď bez internal error.
-- [ ] Doména: `welcome`
-  - [ ] Přivítání se spustí na `guildMemberAdd`.
-  - [ ] Odesláná zpráva je ve správném kanálu a s nastavenými parametry.
-- [ ] Doména: `moderation`
-  - [ ] Příkazy pro timeoute/ban/kick/reply se vykonávají jen s oprávněním.
-  - [ ] Logging akce/moderace se uloží podle očekávání.
+- [x] Doména: `welcome`
+  - [x] Přivítání se spustí na `guildMemberAdd`.
+  - [x] Odesláná zpráva je ve správném kanálu a s nastavenými parametry.
 - [ ] Doména: `counting`
   - [ ] Pořadí zpráv a ochrana proti duplicitám funguje.
   - [ ] Konfigurace kanálu přes runtime config drží stav i po restartu.
